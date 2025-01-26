@@ -9,7 +9,6 @@ from hivebox.temperature import avg_data
 def test_one_input(data):
     """Test the avg_data function with fuzzed input."""
     fdp = atheris.FuzzedDataProvider(data)
-
     num_boxes = fdp.ConsumeIntInRange(0, 5)  
     test_data = {}
 
