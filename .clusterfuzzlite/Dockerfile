@@ -1,4 +1,4 @@
-FROM gcr.io/oss-fuzz-base/base-builder-python@sha256:21d065e1b72764f938247c38a47698ffc7ac4c9dcbd3eb150532a4e7c9ac2af7
+FROM gcr.io/oss-fuzz-base/base-builder-python@sha256:fb67bbf60d368d6892e911ddaefd6812f4003d86013d356abd51c34b3f44b54e
 COPY . $SRC/hivebox
 WORKDIR $SRC/hivebox
 RUN pip3 install --require-hashes -r requirements.txt
