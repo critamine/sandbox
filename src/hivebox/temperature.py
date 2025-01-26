@@ -61,15 +61,14 @@ def avg_data(trimmed_result):
         return None
 
 def get_temperature_status(averaged_result: int) -> str:
-    """Returns a temperature status string based on input value: Too Cold (<=10), Good (11-36), or Too Hot (>36)."""
+    """Returns a temperature status string based on input value"""
     if averaged_result is None:
         return "No Data"
     if averaged_result <= 10:
         return "Too Cold"
-    elif averaged_result <= 36:
+    if averaged_result <= 36:
         return "Good"
-    else:
-        return "Too Hot"
+    return "Too Hot"
 
 def get_average_temperature():
     """Get current average temperature from all valid sensors."""

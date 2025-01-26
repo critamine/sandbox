@@ -1,10 +1,13 @@
 #!/usr/bin/python3
 
-import atheris
+"""Fuzzing script for testing the avg_data function from hivebox.temperature."""
+
 import sys
+import atheris
 from hivebox.temperature import avg_data
 
-def TestOneInput(data):
+def test_one_input(data):
+    """Test the avg_data function with fuzzed input."""
     fdp = atheris.FuzzedDataProvider(data)
 
     num_boxes = fdp.ConsumeIntInRange(0, 5)  
@@ -25,11 +28,12 @@ def TestOneInput(data):
 
     except ZeroDivisionError:
         return
-    except Exception:
+    except ValueError:
         return
 
 def main():
-    atheris.Setup(sys.argv, TestOneInput)
+    """Set up and run the fuzzer."""
+    atheris.Setup(sys.argv, test_one_input)
     atheris.Fuzz()
 
 if __name__ == "__main__":
