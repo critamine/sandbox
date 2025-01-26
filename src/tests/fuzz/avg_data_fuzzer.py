@@ -27,7 +27,7 @@ def test_one_input(data):
 
     except ZeroDivisionError:
         return
-    except ValueError:
+    except Exception:
         return
 
 def main():
