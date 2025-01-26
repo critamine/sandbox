@@ -1,0 +1,77 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "baseBranches": [
+    "main"
+  ],
+  "rebaseWhen": "conflicted",
+  "labels": [
+    "dependencies"
+  ],
+  "automergeStrategy": "merge-commit",
+  "pinDigests": true,
+  "prHourlyLimit": 2,
+  "packageRules": [
+    {
+      "matchManagers": [
+        "pep621"
+      ],
+      "fileMatch": [
+        "(^|/)pyproject\\.toml$"
+      ],
+      "separateMinorPatch": true
+    },
+    {
+      "matchManagers": [
+        "pep621"
+      ],
+      "fileMatch": [
+        "(^|/)pyproject\\.toml$"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "schedule": [
+        "every weekend after 4am"
+      ]
+    },
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchPackagePatterns": [
+        "python"
+      ],
+      "separateMinorPatch": true
+    },
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchPackagePatterns": [
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "schedule": [
+        "every weekend after 4am"
+      ]
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "pinDigests": true,
+      "schedule": [
+        "every weekend after 4am"
+      ]
+    }
+  ]
+}

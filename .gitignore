@@ -1,0 +1,13 @@
+# Secrets
+.env
+.envrc
+
+# Python cache
+__pycache__/
+.ruff_cache/
+
+# Build artifacts and environments
+build/
+.venv/
+*.egg-info/
+uv.lock

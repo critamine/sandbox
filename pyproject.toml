@@ -1,0 +1,20 @@
+[project]
+name = "hivebox"
+version = "0.2.0"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "fastapi>=0.115.6,<0.116.0",  # Allows patches but not minor version bumps
+    "pydantic>=2.10.5,<2.11.0",
+    "uvicorn>=0.34.0,<0.35.0",
+    "requests>=2.32.3,<2.33.0",
+    "httpx>=0.28.1,<0.29.0",
+    "exceptiongroup>=1.2.2,<1.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4,<8.4.0",
+    "pylint>=3.3.3,<3.4.0",
+    "pytest-mock>=3.14.0,<3.15.0",
+    "atheris>=2.3.0,<2.4.0"
+]
