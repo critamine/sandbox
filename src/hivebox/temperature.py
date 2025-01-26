@@ -60,9 +60,25 @@ def avg_data(trimmed_result):
     except ZeroDivisionError:
         return None
 
+def get_temperature_status(averaged_result: int) -> str:
+    """Returns a temperature status string based on input value: Too Cold (<=10), Good (11-36), or Too Hot (>36)."""
+    if averaged_result is None:
+        return "No Data"
+    if averaged_result <= 10:
+        return "Too Cold"
+    elif averaged_result <= 36:
+        return "Good"
+    else:
+        return "Too Hot"
+
 def get_average_temperature():
     """Get current average temperature from all valid sensors."""
     result = fetch_data()
     trimmed_result = trim_data(result)
     validated_result = validate_data(trimmed_result)
-    return avg_data(validated_result)
+    averaged_result = avg_data(validated_result)
+    temperature_status = get_temperature_status(averaged_result)
+    return {
+        "temperature": averaged_result,
+        "status": temperature_status
+    }

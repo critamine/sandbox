@@ -15,7 +15,7 @@ async def get_version():
 @app.get("/temperature")
 async def get_temperature():
     """Get average temperature."""
-    return {"temperature": get_average_temperature()}
+    return get_average_temperature()
 
 @app.get("/metrics")
 async def metrics():
@@ -24,6 +24,7 @@ async def metrics():
         content=prometheus_client.generate_latest(),
         media_type="text/plain"
     )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
