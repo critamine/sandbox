@@ -1,9 +1,9 @@
 """Main entry point for the application."""
 
+import prometheus_client
 from fastapi import FastAPI, Response
 from hivebox import __version__
 from hivebox.temperature import get_average_temperature
-import prometheus_client
 
 app = FastAPI()
 

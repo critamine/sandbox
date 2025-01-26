@@ -19,9 +19,7 @@ def test_get_temperature(mocker):
         "status": "Good"  
     }
     mocker.patch('main.get_average_temperature', return_value=mock_return_value)
-    
     response = client.get("/temperature")
-    
     assert response.status_code == 200
     assert "temperature" in response.json()
     assert "status" in response.json()
