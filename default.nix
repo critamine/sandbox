@@ -5,6 +5,8 @@ in pkgs.mkShell {
     pkgs.act
     pkgs.uv
     pkgs.python311
+    pkgs.kubectl
+    pkgs.kind
   ];
   
  shellHook = ''
