@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hivebox
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hivebox
+  namespace: hivebox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hivebox
+  template:
+    metadata:
+      labels:
+        app: hivebox
+    spec:
+      containers:
+      - name: hivebox
+        image: hivebox:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hivebox-service
+  namespace: hivebox
+spec:
+  selector:
+    app: hivebox
+  ports:
+  - port: 80
+    targetPort: 8000
