@@ -24,7 +24,7 @@ async def get_temperature():
             "status": result.status
         }
     except TemperatureServiceError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.get("/metrics")
 async def metrics():
