@@ -72,9 +72,9 @@ def mock_sensor_responses_stale():
 @pytest.fixture
 def mock_sensor_responses_invalid_json():
     return {
-        "tempSensor01": "{invalid[json'syntax",  
-        "tempSensor02": "{'lastMeasurement': {", 
-        "tempSensor03": "null{]"  
+        "tempSensor01": "{invalid[json'syntax",
+        "tempSensor02": "{'lastMeasurement': {",
+        "tempSensor03": "null{]"
     }
 
 @pytest.fixture
