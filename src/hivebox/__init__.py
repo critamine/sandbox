@@ -10,6 +10,6 @@ SENSEBOX_TEMP_SENSORS = {
 
 FORMAT = 'json'
 
-def get_sensorData(box_id, sensor_id):
+def get_sensor_data(box_id, sensor_id):
     """Generate API URL to retrieve temperature for given senseBox."""
     return f'https://api.opensensemap.org/boxes/{box_id}/sensors/{sensor_id}'

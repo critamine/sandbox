@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List, Dict
 import requests
-from . import get_sensorData
+from . import get_sensor_data
 
 
 class TemperatureServiceError(Exception):
@@ -52,7 +52,7 @@ class TemperatureService:
         current_time = datetime.now(timezone.utc)
 
         for box_id, sensor_id in self.sensor_data.items():
-            url = get_sensorData(box_id, sensor_id)
+            url = get_sensor_data(box_id, sensor_id)
             try:
                 response = requests.get(url, timeout=30)
                 data = response.json()
