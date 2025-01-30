@@ -1,6 +1,6 @@
 """Hivebox package configuration and shared utilities."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 SENSEBOX_TEMP_SENSORS = {
     '62abdbfbb91502001b7c05a8': '62abdbfbb91502001b7c05ab',
