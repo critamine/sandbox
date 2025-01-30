@@ -1,83 +1,81 @@
 """Temperature data processing module."""
 
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import List, Dict
 import requests
-from . import SENSE_BOX_IDS, get_url
+from . import get_sensorData
 
-def fetch_data():
-    """Fetch raw temperature data from all sensor boxes."""
-    timeout = 10  # seconds
-    return {
-        sense_box_id: requests.get(get_url(sense_box_id), timeout=timeout).json()
-        if requests.get(get_url(sense_box_id), timeout=timeout).status_code == 200
-        else f"Error: {requests.get(get_url(sense_box_id), timeout=timeout).status_code}"
-        for sense_box_id in SENSE_BOX_IDS
-    }
+class TemperatureServiceError(Exception):
+    pass
 
-def trim_data(raw_data):
-    """Extract relevant temperature data from raw sensor data."""
-    return {
-        box_id: {
-            'name': data.get('name'),
-            'last': next(
-                (sensor['lastMeasurement']
-                for sensor in data.get('sensors', [])
-                if sensor.get('title') == 'Temperatur' and 'lastMeasurement' in sensor),
-                None
-            )
-        }
-        for box_id, data in raw_data.items()
-        if isinstance(data, dict) and data.get('name')
-    }
+@dataclass
+class SensorReading:
+    sensor_id: str
+    value: float
+    timestamp: datetime
 
-def validate_data(trimmed_data):
-    """Filter data to include only recent measurements."""
-    now = datetime.now(timezone.utc)
-    one_hour_ago = now - timedelta(hours=1)
+@dataclass
+class TemperatureResult:
+    value: float
+    status: str
 
-    return {
-        box_id: data
-        for box_id, data in trimmed_data.items()
-        if data['last'] and is_recent_data(data['last']['createdAt'], one_hour_ago)
-    }
+class TemperatureService:
+    def __init__(self, sensor_data: Dict[str, str]):
+        if not sensor_data:
+            raise TemperatureServiceError("No sensor data provided")
+        self.sensor_data = sensor_data
 
-def is_recent_data(timestamp: str, cutoff: datetime) -> bool:
-    """Check if timestamp is more recent than cutoff."""
-    normalized_timestamp = timestamp.replace('Z', '+00:00')
-    parsed_time = datetime.fromisoformat(normalized_timestamp)
-    return parsed_time > cutoff
+    def get_average_temperature(self) -> TemperatureResult:
+        readings = self._fetch_readings()
+        if not readings:
+            raise TemperatureServiceError("No readings available")
 
-def avg_data(trimmed_result):
-    """Calculate average temperature from valid sensors, returns None if no data available."""
-    temperatures = [
-        float(box['last']['value'])
-        for box in trimmed_result.values()
-        if box['last'] and 'value' in box['last']
-    ]
+        avg_temp = round(sum(r.value for r in readings) / len(readings), 1)
+        status = self._determine_temperature_status(avg_temp)
+        
+        return TemperatureResult(value=avg_temp, status=status)
 
-    try:
-        return int(sum(temperatures) / len(temperatures))
-    except ZeroDivisionError:
-        return None
+    def _fetch_readings(self) -> List[SensorReading]:
+        readings = []
+        current_time = datetime.now(timezone.utc)  
 
-def get_temperature_status(averaged_result: int) -> str:
-    """Returns a temperature status string based on input value"""
-    if averaged_result is None:
-        return "No Data"
-    if averaged_result <= 10:
-        return "Too Cold"
-    if averaged_result <= 36:
-        return "Good"
-    return "Too Hot"
+        for sensor_id, box_id in self.sensor_data.items():
+            url = get_sensorData(sensor_id, box_id)
+            try:
+                response = requests.get(url)
+                data = response.json()
 
-def get_average_temperature():
-    """Get current average temperature from all valid sensors."""
-    result = fetch_data()
-    trimmed_result = trim_data(result)
-    validated_result = validate_data(trimmed_result)
-    averaged_result = avg_data(validated_result)
-    temperature_status = get_temperature_status(averaged_result)
-    return {
-        "temperature": averaged_result,
-        "status": temperature_status
-    }
+                reading_time = datetime.fromisoformat(data['lastMeasurement']['createdAt'].replace('Z', '+00:00'))
+                time_diff = current_time - reading_time
+
+                if time_diff.total_seconds() > 3600:  
+                    continue
+
+                reading = SensorReading(
+                    timestamp=reading_time,
+                    value=float(data['lastMeasurement']['value']),
+                    sensor_id=sensor_id
+                )
+                readings.append(reading)
+
+            except requests.RequestException as e:
+                raise TemperatureServiceError(f"Failed to fetch data for sensor {sensor_id}: {str(e)}")
+            except ValueError as e:
+                raise TemperatureServiceError(f"Invalid data received from sensor {sensor_id}: {str(e)}")
+
+        if not readings:
+            raise TemperatureServiceError("All available readings are over 1 hour old")
+
+        return readings
+
+    def _determine_temperature_status(self, temperature: float) -> str:
+        if not isinstance(temperature, (int, float)):
+            raise TemperatureServiceError(f"Invalid temperature value: {temperature}")
+
+        if temperature <= 10:
+            return "Too Cold"
+        elif 11 <= temperature <= 36:
+            return "Good"
+        else:
+            return "Too Hot"

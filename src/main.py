@@ -1,9 +1,10 @@
 """Main entry point for the application."""
 
 import prometheus_client
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, HTTPException
 from hivebox import __version__
-from hivebox.temperature import get_average_temperature
+from hivebox.temperature import TemperatureService, TemperatureServiceError
+from hivebox import SENSEBOX_TEMP_SENSORS as SB_DATA
 
 app = FastAPI()
 
@@ -15,7 +16,15 @@ async def get_version():
 @app.get("/temperature")
 async def get_temperature():
     """Get average temperature."""
-    return get_average_temperature()
+    try:
+        service = TemperatureService(SB_DATA)
+        result = service.get_average_temperature()
+        return {
+            "value": result.value,
+            "status": result.status
+        }
+    except TemperatureServiceError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/metrics")
 async def metrics():
