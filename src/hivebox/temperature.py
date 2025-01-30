@@ -9,7 +9,6 @@ from . import get_sensorData
 
 class TemperatureServiceError(Exception):
     """Raised when temperature service operations fail."""
-    pass
 
 
 @dataclass
@@ -26,7 +25,7 @@ class TemperatureResult:
     value: float
     status: str
 
-
+# pylint: disable=too-few-public-methods
 class TemperatureService:
     """Service for processing temperature data from sensors."""
 
