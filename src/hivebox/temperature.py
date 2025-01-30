@@ -40,8 +40,8 @@ class TemperatureService:
         readings = []
         current_time = datetime.now(timezone.utc)  
 
-        for sensor_id, box_id in self.sensor_data.items():
-            url = get_sensorData(sensor_id, box_id)
+        for box_id, sensor_id in self.sensor_data.items():
+            url = get_sensorData(box_id, sensor_id)
             try:
                 response = requests.get(url)
                 data = response.json()
