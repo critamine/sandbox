@@ -1,6 +1,5 @@
 """Fuzzer for temperature module's status determination."""
-# pylint: disable=broad-except
-# pylint: disable=protected-access
+# pylint: disable=broad-except, protected access, duplicate-code
 
 import sys
 import struct
