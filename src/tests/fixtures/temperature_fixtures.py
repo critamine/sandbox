@@ -1,8 +1,11 @@
-import pytest
+"""Test fixtures for temperature service module."""
+
 from datetime import datetime, timezone, timedelta
+import pytest
 
 @pytest.fixture
 def mock_sensor_data():
+    """Return mock mapping of box IDs to sensor IDs."""
     return {
         'senseBox01': 'tempSensor01',
         'senseBox02': 'tempSensor02',
@@ -11,6 +14,7 @@ def mock_sensor_data():
 
 @pytest.fixture
 def mock_temperature_averages():
+    """Return test cases for temperature status determinations."""
     return [
         (5.0, "Too Cold"),
         (10.0, "Too Cold"),
@@ -23,6 +27,7 @@ def mock_temperature_averages():
 
 @pytest.fixture
 def mock_sensor_responses():
+    """Return mock sensor responses with current timestamps."""
     current_time = datetime.now(timezone.utc).isoformat()
     return {
         "tempSensor01": {
@@ -47,6 +52,7 @@ def mock_sensor_responses():
 
 @pytest.fixture
 def mock_sensor_responses_stale():
+    """Return mock sensor responses with timestamps older than one hour."""
     two_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
     return {
         "tempSensor01": {
@@ -71,6 +77,7 @@ def mock_sensor_responses_stale():
 
 @pytest.fixture
 def mock_sensor_responses_invalid_json():
+    """Return mock sensor responses with invalid JSON syntax."""
     return {
         "tempSensor01": "{invalid[json'syntax",
         "tempSensor02": "{'lastMeasurement': {",
@@ -79,6 +86,7 @@ def mock_sensor_responses_invalid_json():
 
 @pytest.fixture
 def mock_sensor_responses_invalid_value():
+    """Return mock sensor response with non-numeric temperature value."""
     current_time = datetime.now(timezone.utc).isoformat()
     return {
         "tempSensor01": {
