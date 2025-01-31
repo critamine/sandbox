@@ -1,4 +1,7 @@
 """Test suite for temperature data processing module."""
+# pylint: disable=unused-import
+# ruff: noqa: F401, F811
+
 import pytest
 import requests
 import json
