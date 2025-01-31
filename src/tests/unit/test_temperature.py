@@ -28,8 +28,9 @@ def test_temperatureservice_init(mock_sensor_data):
 
 def test_temperatureservice_init_nodata():
     """Test TemperatureService initialization with empty sensor data."""
-    with pytest.raises(TemperatureServiceError):
+    with pytest.raises(TemperatureServiceError) as e:
         TemperatureService({})
+    assert str(e.value == "No sensor data provided")
 
 
 @pytest.mark.parametrize("temperature,expected_status", [
