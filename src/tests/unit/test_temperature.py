@@ -116,6 +116,7 @@ def test_fetch_readings_invalid_json(mock_sensor_data, mock_sensor_responses_inv
     service = TemperatureService(mock_sensor_data)
     with pytest.raises(TemperatureServiceError) as excinfo:
         service._fetch_readings()
+    assert "Invalid data received from sensor" in str(excinfo.value)
 
 def test_fetch_readings_value_error(mock_sensor_data, mock_sensor_responses_invalid_value, mocker):
     mock_get = mocker.patch('requests.get')
