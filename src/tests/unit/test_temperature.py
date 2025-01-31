@@ -1,10 +1,11 @@
 """Test suite for temperature data processing module."""
-# pylint: disable=unused-import
+# pylint: disable=unused-import,protected-access
 # ruff: noqa: F401, F811
 
+import json
 import pytest
 import requests
-import json
+
 from tests.fixtures.temperature_fixtures import (
     mock_temperature_averages,
     mock_sensor_data,
@@ -18,13 +19,18 @@ from hivebox.temperature import (
     TemperatureServiceError
 )
 
+
 def test_temperatureservice_init(mock_sensor_data):
+    """Test successful initialization of TemperatureService with sensor data."""
     service = TemperatureService(mock_sensor_data)
     assert service.sensor_data == mock_sensor_data
 
+
 def test_temperatureservice_init_nodata():
+    """Test TemperatureService initialization with empty sensor data."""
     with pytest.raises(TemperatureServiceError):
         TemperatureService({})
+
 
 @pytest.mark.parametrize("temperature,expected_status", [
     (5.0, "Too Cold"),
@@ -36,11 +42,14 @@ def test_temperatureservice_init_nodata():
     (40.0, "Too Hot"),
 ])
 def test_determine_temperature_status(mock_sensor_data, temperature, expected_status):
+    """Test determination of temperature status for various input values."""
     service = TemperatureService(mock_sensor_data)
     status = service._determine_temperature_status(temperature)
     assert status == expected_status
 
+
 def test_get_average_temperature(mock_sensor_data, mock_sensor_responses, mocker):
+    """Test calculating average temperature from multiple sensor readings."""
     mock_get = mocker.patch('requests.get')
 
     mock_get.return_value.json.side_effect = [
@@ -57,7 +66,9 @@ def test_get_average_temperature(mock_sensor_data, mock_sensor_responses, mocker
     assert result.status == "Good"
     assert mock_get.call_count == 3
 
+
 def test_fetch_readings_successful(mock_sensor_data, mock_sensor_responses, mocker):
+    """Test successful fetch of sensor readings."""
     mock_get = mocker.patch('requests.get')
     mock_get.return_value.json.side_effect = [
         mock_sensor_responses["tempSensor01"],
@@ -80,7 +91,9 @@ def test_fetch_readings_successful(mock_sensor_data, mock_sensor_responses, mock
 
     assert mock_get.call_count == 3
 
+
 def test_fetch_readings_stale(mock_sensor_data, mock_sensor_responses_stale, mocker):
+    """Test behavior when all sensor readings are older than one hour."""
     mock_get = mocker.patch('requests.get')
     mock_get.return_value.json.side_effect = [
         mock_sensor_responses_stale["tempSensor01"],
@@ -95,33 +108,40 @@ def test_fetch_readings_stale(mock_sensor_data, mock_sensor_responses_stale, moc
         service._fetch_readings()
     assert str(e.value) == "All available readings are over 1 hour old"
 
+
 def test_fetch_readings_connection_error(mock_sensor_data, mocker):
+    """Test handling of connection errors during sensor reading fetch."""
     mock_get = mocker.patch('requests.get')
     mock_get.side_effect = requests.exceptions.ConnectionError()
     service = TemperatureService(mock_sensor_data)
     sensor_id = list(mock_sensor_data.values())[0]
 
-    with pytest.raises(TemperatureServiceError) as excinfo:
+    with pytest.raises(TemperatureServiceError) as e:
         service._fetch_readings()
 
-    error_msg = str(excinfo.value)
+    error_msg = str(e.value)
     assert f"Failed to fetch data for sensor {sensor_id}" in error_msg
     assert isinstance(mock_get.side_effect, requests.exceptions.ConnectionError)
 
+
 def test_fetch_readings_invalid_json(mock_sensor_data, mock_sensor_responses_invalid_json, mocker):
+    """Test handling of invalid JSON responses from sensors."""
     mock_get = mocker.patch('requests.get')
     mock_response = mocker.Mock()
     mock_response.json.side_effect = [
-            json.JSONDecodeError('Invalid JSON', mock_sensor_responses_invalid_json["tempSensor01"], 0)
-        ]
+        json.JSONDecodeError('Invalid JSON', 
+        mock_sensor_responses_invalid_json["tempSensor01"], 0)
+    ]
     mock_get.return_value = mock_response
 
     service = TemperatureService(mock_sensor_data)
-    with pytest.raises(TemperatureServiceError) as excinfo:
+    with pytest.raises(TemperatureServiceError) as e:
         service._fetch_readings()
-    assert "Invalid data received from sensor" in str(excinfo.value)
+    assert "Invalid data received from sensor" in str(e.value)
+
 
 def test_fetch_readings_value_error(mock_sensor_data, mock_sensor_responses_invalid_value, mocker):
+    """Test handling of invalid temperature value responses."""
     mock_get = mocker.patch('requests.get')
     mock_response = mocker.Mock()
     mock_response.json.return_value = mock_sensor_responses_invalid_value["tempSensor01"]
@@ -130,6 +150,6 @@ def test_fetch_readings_value_error(mock_sensor_data, mock_sensor_responses_inva
 
     service = TemperatureService(mock_sensor_data)
 
-    with pytest.raises(TemperatureServiceError) as excinfo:
+    with pytest.raises(TemperatureServiceError) as e:
         service._fetch_readings()
-    assert "Invalid data received from sensor" in str(excinfo.value)
+    assert "Invalid data received from sensor" in str(e.value)
