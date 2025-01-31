@@ -1,5 +1,5 @@
 """Fuzzer for temperature module's sensor data parsing."""
-# pylint: disable=broad-except,protected access,duplicate-code
+# pylint: disable=broad-except,protected-access,duplicate-code
 
 import sys
 import json
