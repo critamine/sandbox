@@ -1,7 +1,10 @@
 """Fuzzer for temperature module's sensor data parsing."""
-import atheris
+# pylint: disable=broad-except
+# pylint: disable=protected-access
+
 import sys
 import json
+import atheris
 from hivebox.temperature import TemperatureService
 
 @atheris.instrument_func

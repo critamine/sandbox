@@ -1,8 +1,10 @@
 """Fuzzer for temperature module's status determination."""
+# pylint: disable=broad-except
+# pylint: disable=protected-access
 
-import atheris
 import sys
 import struct
+import atheris
 from hivebox.temperature import TemperatureService
 
 @atheris.instrument_func
