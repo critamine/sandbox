@@ -1,5 +1,4 @@
 """Test suite for temperature data processing module."""
-
 import pytest
 import requests
 import json
@@ -126,11 +125,6 @@ def test_fetch_readings_value_error(mock_sensor_data, mock_sensor_responses_inva
     mock_get.return_value = mock_response
 
     service = TemperatureService(mock_sensor_data)
-    sensor_id = list(mock_sensor_data.values())[0]
-
-    print(f"Mock data: {mock_response.json.return_value}")  # See what we're mocking
-    print(f"Sensor ID: {sensor_id}")  # Verify sensor ID
-    print(f"Mock sensor data: {mock_sensor_data}")  # See what's in mock_sensor_data
 
     with pytest.raises(TemperatureServiceError) as excinfo:
         service._fetch_readings()
