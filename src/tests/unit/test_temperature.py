@@ -1,5 +1,5 @@
 """Test suite for temperature data processing module."""
-# pylint: disable=unused-import,protected-access
+# pylint: disable=unused-import,protected-access, redefined-outer-name
 # ruff: noqa: F401, F811
 
 import json
@@ -130,7 +130,7 @@ def test_fetch_readings_invalid_json(mock_sensor_data, mock_sensor_responses_inv
     mock_get = mocker.patch('requests.get')
     mock_response = mocker.Mock()
     mock_response.json.side_effect = [
-        json.JSONDecodeError('Invalid JSON', 
+        json.JSONDecodeError('Invalid JSON',
         mock_sensor_responses_invalid_json["tempSensor01"], 0)
     ]
     mock_get.return_value = mock_response
