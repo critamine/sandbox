@@ -43,7 +43,7 @@ jobs:
 
         with:
           cache: true
-          version: v0.59.1
+          version: v0.59.0
 
       - name: Trivy repo mode scan
         uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
