@@ -55,6 +55,11 @@ jobs:
           severity: 'CRITICAL'
           skip-setup-trivy: true
 
+      - name: Upload Trivy scan results to GitHub security
+        uses: github/condeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
   test:
     runs-on: ubuntu-latest
     steps:
