@@ -40,7 +40,6 @@ jobs:
 
       - name: Trivy Setup
         uses: aquasecurity/setup-trivy@ff1b8b060f23b650436d419b5e13f67f5d4c3087
-
         with:
           cache: true
           version: v0.59.0
