@@ -35,6 +35,28 @@ jobs:
         with:
           dockerfile: Dockerfile
 
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+
+      - name: Trivy Setup
+        uses: aquasecurity/setup-trivy@ff1b8b060f23b650436d419b5e13f67f5d4c3087
+
+        with:
+          cache: true
+          version: v0.59.1
+
+      - name: Trivy repo mode scan
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL'
+          skip-setup-trivy: true
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -76,7 +98,7 @@ jobs:
 
   build-and-verify:
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint, test, security-scan]
     steps:
       - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
 
