@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-python@d0b4fc497a1daddb64da40799d80949aa3a0c559
         with:
@@ -34,6 +32,32 @@ jobs:
         uses: hadolint/hadolint-action@d292784f8f3eacda47060b259a580467b0ba410c
         with:
           dockerfile: Dockerfile
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+
+      - name: Trivy Setup
+        uses: aquasecurity/setup-trivy@ff1b8b060f23b650436d419b5e13f67f5d4c3087
+        with:
+          cache: true
+          version: v0.59.0
+
+      - name: Trivy repo mode scan
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL'
+          skip-setup-trivy: true
+
+      - name: Upload Trivy scan results to GitHub security
+        uses: github/codeql-action/upload-sarif@7e3036b9cd87fc26dd06747b7aa4b96c27aaef3a
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   test:
     runs-on: ubuntu-latest
@@ -76,7 +100,7 @@ jobs:
 
   build-and-verify:
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint, test, security-scan, sonarqube]
     steps:
       - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
 
