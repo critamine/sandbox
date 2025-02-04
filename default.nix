@@ -7,6 +7,7 @@ in pkgs.mkShell {
     pkgs.python311
     pkgs.kubectl
     pkgs.kind
+    pkgs.checkov
   ];
   
  shellHook = ''
