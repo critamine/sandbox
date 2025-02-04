@@ -61,7 +61,6 @@ jobs:
         uses: bridgecrewio/checkov-action@ceeeb0f3290d3f95a8707b3f36a83379e5f21aaf
         with:
           quiet: true
-          skip_framework: github_actions
           output_format: cli,sarif
           output_file_path: console,checkov-results.sarif
 
