@@ -51,6 +51,8 @@ jobs:
         with:
           scan-type: 'fs'
           format: 'sarif'
+          ignore-unfixed: true
+          exit-code: 1
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           skip-setup-trivy: true
