@@ -53,7 +53,6 @@ jobs:
           scanners: 'vuln,secret,misconfig'
           format: 'sarif'
           ignore-unfixed: true
-          exit-code: 1
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           skip-setup-trivy: true
@@ -62,6 +61,17 @@ jobs:
         uses: github/codeql-action/upload-sarif@7e3036b9cd87fc26dd06747b7aa4b96c27aaef3a
         with:
           sarif_file: trivy-results.sarif
+
+      - name: Fail build on High/Critical Trivy issues
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
+        with:
+          scan-type: "fs"
+          format: table
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          skip-setup-trivy: true
 
   test:
     runs-on: ubuntu-latest
