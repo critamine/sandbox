@@ -62,7 +62,6 @@ jobs:
         with:
           quiet: true
           skip_framework: github_actions
-          soft_fail: true
           output_format: cli,sarif
           output_file_path: console,checkov-results.sarif
 
