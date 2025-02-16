@@ -74,6 +74,8 @@ jobs:
           exit-code: 1
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
+        env:
+          TRIVY_DEBUG: true
 
   test:
     runs-on: ubuntu-latest
