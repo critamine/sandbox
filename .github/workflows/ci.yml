@@ -75,6 +75,7 @@ jobs:
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
         env:
+          TRIVY_SEVERITY: ""
           TRIVY_DEBUG: true
 
   test:
