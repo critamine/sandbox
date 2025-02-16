@@ -78,6 +78,7 @@ jobs:
           trivyignores: ./.trivyignore
         env:
           TRIVY_SEVERITY: 'CRITICAL'
+          TRIVY_DEBUG: true
 
   test:
     runs-on: ubuntu-latest
