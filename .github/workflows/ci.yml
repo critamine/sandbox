@@ -73,9 +73,11 @@ jobs:
           scan-ref: .
           severity: CRITICAL
           ignore-unfixed: true
-          exit-code: 0
+          exit-code: 1
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
+        env:
+          TRIVY_SEVERITY: 'CRITICAL'
 
   test:
     runs-on: ubuntu-latest
