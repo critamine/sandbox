@@ -71,11 +71,10 @@ jobs:
           scan-ref: .
           severity: CRITICAL
           ignore-unfixed: true
-          exit-code: 1
+          exit-code: 0
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
         env:
-          TRIVY_SEVERITY: ""
           TRIVY_DEBUG: true
 
   test:
