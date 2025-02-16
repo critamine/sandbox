@@ -57,6 +57,8 @@ jobs:
           severity: 'CRITICAL,HIGH'
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
+        env:
+          TRIVY_DEBUG: true
 
       - name: Upload Trivy scan results to GitHub security
         uses: github/codeql-action/upload-sarif@7e3036b9cd87fc26dd06747b7aa4b96c27aaef3a
@@ -74,8 +76,6 @@ jobs:
           exit-code: 0
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
-        env:
-          TRIVY_DEBUG: true
 
   test:
     runs-on: ubuntu-latest
