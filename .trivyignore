@@ -1,0 +1,2 @@
+# KSV041 excluded as NGINX Ingress Controller needs cluster-scoped secret access for functionality.
+KSV041

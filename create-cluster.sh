@@ -22,7 +22,7 @@ fi
 
 # Create cluster
 echo "Creating Kubernetes cluster with kind..."
-kind create cluster --config "$KIND_CONFIG" --verbosity 4 || exit 1
+kind create cluster --config "$KIND_CONFIG" --verbosity 4
 
 # Load image
 echo "Loading $HIVEBOX_IMAGE into the cluster..."
