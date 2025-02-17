@@ -52,9 +52,9 @@ jobs:
           scan-type: 'fs'
           scanners: 'vuln,secret,misconfig'
           format: 'sarif'
+          severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
         env:
@@ -85,8 +85,8 @@ jobs:
         uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
         with:
           scan-type: "fs"
+          scanners: 'vuln,secret,misconfig'
           format: table
-          scan-ref: .
           severity: CRITICAL
           ignore-unfixed: true
           exit-code: 1
