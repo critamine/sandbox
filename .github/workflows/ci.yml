@@ -65,6 +65,22 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
+      - name: Sanitize GITHUB_ENV
+        run: |
+          echo "TRIVY_IGNORE_UNFIXED=" >> $GITHUB_ENV
+          echo "TRIVY_SEVERITY=" >> $GITHUB_ENV
+          echo "TRIVY_FORMAT=" >> $GITHUB_ENV
+          echo "TRIVY_OUTPUT=" >> $GITHUB_ENV
+          echo "TRIVY_SCANNERS=" >> $GITHUB_ENV
+          echo "CODEQL_ACTION_FEATURE_MULTI_LANGUAGE=" >> $GITHUB_ENV
+          echo "CODEQL_ACTION_FEATURE_SANDWICH=" >> $GITHUB_ENV
+          echo "CODEQL_ACTION_FEATURE_SARIF_COMBINE=" >> $GITHUB_ENV
+          echo "CODEQL_ACTION_FEATURE_WILL_UPLOAD=" >> $GITHUB_ENV
+          echo "CODEQL_ACTION_VERSION=" >> $GITHUB_ENV
+          echo "CODEQL_ACTION_ANALYSIS_KEY=" >> $GITHUB_ENV
+          echo "CODEQL_WORKFLOW_STARTED_AT=" >> $GITHUB_ENV
+          echo "CODEQL_UPLOAD_SARIF__GITHUB_WORKFLOWS_CI_YML_SECURITY_SCAN__TRIVY=" >> $GITHUB_ENV
+
       - name: Fail build on Critical Trivy issues
         uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0
         with:
@@ -76,9 +92,6 @@ jobs:
           exit-code: 1
           skip-setup-trivy: true
           trivyignores: ./.trivyignore
-        env:
-          TRIVY_SEVERITY: 'CRITICAL'
-          TRIVY_DEBUG: true
 
   test:
     runs-on: ubuntu-latest
