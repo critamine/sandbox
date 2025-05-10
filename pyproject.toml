@@ -1,6 +1,6 @@
 [project]
 name = "hivebox"
-version = "0.2.0"
+dynamic = ["version"]
 requires-python = ">=3.10,<3.12"
 dependencies = [
     "fastapi>=0.115.6,<0.116.0",  # Allows patches but not minor version bumps
@@ -19,3 +19,6 @@ dev = [
     "pytest-mock>=3.14.0,<3.15.0",
     "atheris>=2.3.0,<2.4.0"
 ]
+
+[tool.hatch.version]
+path = "src/hivebox/__init__.py"

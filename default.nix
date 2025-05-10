@@ -4,6 +4,7 @@ in pkgs.mkShell {
   packages = [
     pkgs.act
     pkgs.uv
+    pkgs.hatch
     pkgs.python311
     pkgs.kubectl
     pkgs.kind
