@@ -1,80 +1,44 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    ":semanticCommits"
-  ],
-  "baseBranches": [
-    "main"
-  ],
+  "extends": [":semanticCommits"],
+  "baseBranches": ["main"],
   "rebaseWhen": "conflicted",
-  "labels": [
-    "dependencies"
-  ],
+  "labels": ["dependencies"],
   "automergeStrategy": "merge-commit",
   "pinDigests": true,
   "prHourlyLimit": 2,
   "packageRules": [
     {
-      "matchManagers": [
-        "pep621"
-      ],
-      "fileMatch": [
-        "(^|/)pyproject\\.toml$"
-      ],
+      "matchManagers": ["pep621"],
       "separateMinorPatch": true
     },
     {
-      "matchManagers": [
-        "pep621"
-      ],
-      "fileMatch": [
-        "(^|/)pyproject\\.toml$"
-      ],
-      "matchUpdateTypes": [
-        "patch"
-      ],
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["patch"],
       "automerge": true,
-      "schedule": [
-        "every weekend after 4am"
-      ]
+      "schedule": ["every weekend after 4am"]
     },
     {
-      "matchManagers": [
-        "dockerfile"
-      ],
-      "matchPackagePatterns": [
-        "python"
-      ],
-      "separateMinorPatch": true
+      "matchManagers": ["dockerfile"],
+      "separateMinorPatch": true,
+      "matchPackageNames": ["/python/"]
     },
     {
-      "matchManagers": [
-        "dockerfile"
-      ],
-      "matchPackagePatterns": [
-        "python"
-      ],
-      "matchUpdateTypes": [
-        "patch"
-      ],
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["patch"],
       "automerge": true,
-      "schedule": [
-        "every weekend after 4am"
-      ]
+      "schedule": ["every weekend after 4am"],
+      "matchPackageNames": ["/python/"]
     },
     {
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "pinDigests": true,
-      "schedule": [
-        "every weekend after 4am"
-      ]
+      "schedule": ["every weekend after 4am"]
     }
-  ]
+  ],
+  "pep621": {
+    "managerFilePatterns": ["/(^|/)pyproject\\.toml$/"]
+  }
 }
