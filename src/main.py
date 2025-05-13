@@ -4,7 +4,7 @@ import prometheus_client
 from fastapi import FastAPI, Response, HTTPException
 from hivebox import __version__
 from hivebox.temperature import TemperatureService, TemperatureServiceError
-from hivebox import SENSEBOX_TEMP_SENSORS as SB_DATA
+from hivebox import SENSEBOX_TEMP_SENSORS as SB_SENS
 
 app = FastAPI()
 
@@ -17,7 +17,7 @@ async def get_version():
 async def get_temperature():
     """Get average temperature."""
     try:
-        service = TemperatureService(SB_DATA)
+        service = TemperatureService(SB_SENS)
         result = service.get_average_temperature()
         return {
             "value": result.value,
