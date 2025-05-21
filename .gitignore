@@ -12,3 +12,7 @@ build/
 .venv/
 *.egg-info/
 uv.lock
+
+# Coverage artifacts and reports
+.coverage
+coverage.xml
