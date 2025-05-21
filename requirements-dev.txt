@@ -14,6 +14,10 @@ astroid==3.3.9 \
     --hash=sha256:622cc8e3048684aa42c820d9d218978021c3c3d174fb03a9f0d615921744f550 \
     --hash=sha256:d05bfd0acba96a7bd43e222828b7d9bc1e138aaeb0649707908d3702a9831248
     # via pylint
+async-timeout==4.0.3 \
+    --hash=sha256:4640d96be84d82d02ed59ea2b7105a0f7b33abe8703703cd0ab0bf87c427522f \
+    --hash=sha256:7405140ff1230c310e51dc27b3145b9092d659ce68ff733fb0cefe3ee42be028
+    # via hivebox (pyproject.toml)
 atheris==2.3.0 \
     --hash=sha256:005bde4b5a70e998b7fa097e9aa195972dcc2e04092156a0149cff7aa0de970e \
     --hash=sha256:6d4e83c8a518e7f7d1c82ee52453255bf6309b7b335657534e83747d4fdfa110 \
