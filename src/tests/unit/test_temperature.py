@@ -7,7 +7,6 @@ import pytest
 import requests
 
 from tests.fixtures.temperature_fixtures import (
-    mock_temperature_averages,
     mock_sensor_data,
     mock_sensor_responses,
     mock_sensor_responses_stale,
@@ -15,6 +14,7 @@ from tests.fixtures.temperature_fixtures import (
     mock_sensor_responses_invalid_value
 )
 from hivebox.temperature import (
+    TemperatureResult,
     TemperatureService,
     TemperatureServiceError
 )
@@ -63,6 +63,8 @@ def test_get_average_temperature(mock_sensor_data, mock_sensor_responses, mocker
     service = TemperatureService(mock_sensor_data)
     result = service.get_average_temperature()
 
+    assert isinstance(result, TemperatureResult)
+    assert isinstance(result.timestamp, int)
     assert result.value == 16.3
     assert result.status == "Good"
     assert mock_get.call_count == 3

@@ -13,3 +13,4 @@ services:
     image: redis:7.4.3-alpine
     ports:
       - "6379:6379"
+    command: ["redis-server", "--loglevel", "debug"]

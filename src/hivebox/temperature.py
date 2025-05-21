@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Dict
 import requests
 from . import get_sensor_data
+from pydantic import BaseModel
 
 
 class TemperatureServiceError(Exception):
@@ -19,11 +20,11 @@ class SensorReading:
     timestamp: datetime
 
 
-@dataclass
-class TemperatureResult:
+class TemperatureResult(BaseModel):
     """Final averaged temperature with status for API response."""
     value: float
     status: str
+    timestamp: int
 
 # pylint: disable=too-few-public-methods
 class TemperatureService:
@@ -40,11 +41,12 @@ class TemperatureService:
         readings = self._fetch_readings()
         if not readings:
             raise TemperatureServiceError("No readings available")
-
+               
         avg_temp = round(sum(r.value for r in readings) / len(readings), 1)
         status = self._determine_temperature_status(avg_temp)
+        computed_at = int(datetime.now(timezone.utc).timestamp())
 
-        return TemperatureResult(value=avg_temp, status=status)
+        return TemperatureResult(value=avg_temp, status=status, timestamp=computed_at)
 
     def _fetch_readings(self) -> List[SensorReading]:
         """Fetch current readings from all sensors that are less than 1 hour old."""

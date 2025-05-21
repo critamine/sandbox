@@ -16,8 +16,9 @@ RUN chown -R appuser:appgroup /app
 ENV PYTHONPATH=/app/src
 ENV PORT=8000
 ENV HOST=0.0.0.0
+ENV UV_LOGLVL=debug
 
 # Switch to non-root user to run app
 USER appuser
 
-CMD ["/bin/sh", "-c", "uvicorn src.main:app --host ${HOST} --port ${PORT}"]
+CMD ["/bin/sh", "-c", "uvicorn src.main:app --host ${HOST} --port ${PORT} --log-level ${UV_LOGLVL}"]
