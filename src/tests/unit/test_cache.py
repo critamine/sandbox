@@ -2,7 +2,9 @@
 # pylint: disable=unused-import,protected-access, redefined-outer-name
 # ruff: noqa: F401, F811
 
+from typing import Any, Callable, Generator, Literal
 import pytest
+from pytest_mock import MockerFixture
 
 from hivebox.cache import (
     CacheMessages,
@@ -14,17 +16,17 @@ from tests.fixtures.cache_fixtures import (
     mock_redis_config
 )
 
-def test_cachesvc_init(mock_redis_dsn, mock_redis_config):
+def test_cachesvc_init(mock_redis_dsn: Literal['redis://127.0.0.0:6379/0'], mock_redis_config: dict[str, Any]):
     service = CacheService(mock_redis_dsn, mock_redis_config)
     assert service.dsn == mock_redis_dsn
     assert service.cfg == mock_redis_config
 
 @pytest.mark.asyncio
 async def test_cachesvc_connectfail(
-    mock_redis_dsn,
-    mock_redis_config,
-    mocker,
-    capfd
+    mock_redis_dsn: Literal['redis://127.0.0.0:6379/0'],
+    mock_redis_config: dict[str, Any],
+    mocker: Callable[..., Generator[MockerFixture, None, None]],
+    capfd: pytest.CaptureFixture[str]
 ):
     service = CacheService(mock_redis_dsn, mock_redis_config)
     service.last_retry = 1000212360
@@ -36,9 +38,9 @@ async def test_cachesvc_connectfail(
 
 @pytest.mark.asyncio
 async def test_cachesvc_connect_toosoon(
-    mock_redis_dsn,
-    mock_redis_config,
-    mocker
+    mock_redis_dsn: Literal['redis://127.0.0.0:6379/0'],
+    mock_redis_config: dict[str, Any],
+    mocker: Callable[..., Generator[MockerFixture, None, None]]
 ):
     service = CacheService(mock_redis_dsn, mock_redis_config)
     service.last_retry = 1000000
@@ -50,10 +52,10 @@ async def test_cachesvc_connect_toosoon(
 
 @pytest.mark.asyncio
 async def test_cachesvc_connect_success(
-    mock_redis_dsn,
-    mock_redis_config,
-    mocker,
-    capfd
+    mock_redis_dsn: Literal['redis://127.0.0.0:6379/0'],
+    mock_redis_config: dict[str, Any],
+    mocker: Callable[..., Generator[MockerFixture, None, None]],
+    capfd: pytest.CaptureFixture[str]
 ):
     service = CacheService(mock_redis_dsn, mock_redis_config)
     service.last_retry = 1000000
