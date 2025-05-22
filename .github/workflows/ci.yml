@@ -102,9 +102,6 @@ jobs:
       - name: Run unit tests
         run: pytest src/tests
 
-      - name: Run coverage debug
-        run: coverage debug config
-
       - name: Run coverage
         run: coverage run -m pytest 
 
