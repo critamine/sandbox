@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
             await cache_svc.connect()
         except CacheServiceError:
             print("CacheService Connection Failed", flush=True)
-    except Exception as e:
+    except Exception:
         pass
     yield
 
@@ -89,6 +89,7 @@ async def metrics():
         media_type="text/plain"
     )
 
+# pragma: no cover
 if __name__ == "__main__":
     """Start Uvicorn locally; prod uses Docker CMD."""
     import uvicorn
