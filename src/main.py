@@ -1,6 +1,5 @@
 """Main entry point for the application."""
 
-import os
 import prometheus_client
 from typing import Optional
 from contextlib import asynccontextmanager
