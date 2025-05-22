@@ -11,7 +11,6 @@ __pycache__/
 build/
 .venv/
 *.egg-info/
-uv.lock
 
 # Coverage artifacts and reports
 .coverage
