@@ -68,7 +68,6 @@ async def get_temperature(request: Request):
         return cache
     except CacheServiceError as e:
         print(f"Cache fetch error: {e}")
-        pass
 
     try:
         result = temp_svc.get_average_temperature()
@@ -79,7 +78,6 @@ async def get_temperature(request: Request):
         await cache_svc.update(result)
     except CacheServiceError as e:
         print(f"Cache update error: {e}")
-        pass
 
     return result
 
