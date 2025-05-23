@@ -88,8 +88,7 @@ async def metrics():
         media_type="text/plain"
     )
 
-# pragma: no cover
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     """Start Uvicorn locally; prod uses Docker CMD."""
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000, log_level="trace")
