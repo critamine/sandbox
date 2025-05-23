@@ -1,6 +1,5 @@
 """Main entry point for the application."""
 
-import os
 import prometheus_client
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -48,7 +47,7 @@ async def lifespan(app: FastAPI):
             await cache_svc.connect()
         except CacheServiceError:
             print("CacheService Connection Failed", flush=True)
-    except Exception as e:
+    except Exception:
         pass
     yield
 
@@ -68,7 +67,6 @@ async def get_temperature(request: Request):
         return cache
     except CacheServiceError as e:
         print(f"Cache fetch error: {e}")
-        pass
 
     try:
         result = temp_svc.get_average_temperature()
@@ -79,7 +77,6 @@ async def get_temperature(request: Request):
         await cache_svc.update(result)
     except CacheServiceError as e:
         print(f"Cache update error: {e}")
-        pass
 
     return result
 
@@ -91,6 +88,7 @@ async def metrics():
         media_type="text/plain"
     )
 
+# pragma: no cover
 if __name__ == "__main__":
     """Start Uvicorn locally; prod uses Docker CMD."""
     import uvicorn
