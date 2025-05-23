@@ -1,7 +1,7 @@
 """Redis caching module."""
 
-import json
 import time
+from pydantic import ValidationError
 from redis.asyncio import Redis
 from redis.exceptions import ConnectionError
 from hivebox.temperature import TemperatureResult
@@ -11,6 +11,7 @@ class CacheMessages:
     REDIS_CONN_SUCCESS = "Connection to redis server succeeded"
     RETRY_TOO_SOON = "Tried to reconnect too soon"
     CACHE_OUTDATED = "Cache is outdated"
+    CACHE_INVALID = "Cache is invalid or malformed"
 
 class CacheServiceError(Exception):
     """Raised when cache service operations fail."""
@@ -24,6 +25,7 @@ class CacheService:
         self.tag = "temp:latest"
         self.client = None
         self.last_retry = None
+        self.client = Redis.from_url(self.dsn, **self.cfg)
 
     async def connect(self):
         now = int(time.time())
@@ -32,7 +34,6 @@ class CacheService:
             if delta < 300:
                 raise CacheServiceError(CacheMessages.RETRY_TOO_SOON)
         self.last_retry = now
-        self.client = await Redis.from_url(self.dsn, **self.cfg)
         try:
             await self.client.ping()
             print(CacheMessages.REDIS_CONN_SUCCESS, flush=True)
@@ -45,11 +46,17 @@ class CacheService:
 
     async def fetch(self):
         try:
-            raw = await self.client.get(self.tag)
+            try:
+                raw = await self.client.get(self.tag)
+            except ConnectionError:
+                await self.connect()
+                raw = await self.client.get(self.tag)
         except ConnectionError:
-            await self.connect()
-            raw = await self.client.get(self.tag)
-        cache = TemperatureResult.model_validate_json(raw)
+            raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL)
+        try:
+            cache = TemperatureResult.model_validate_json(raw)
+        except ValidationError:
+            raise CacheServiceError(CacheMessages.CACHE_INVALID)
         if await self._check(cache):
             return cache
         else:
