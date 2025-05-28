@@ -9,7 +9,7 @@ from hivebox.temperature import TemperatureResult
 class CacheMessages:
     REDIS_CONN_FAIL = "Connection to redis server failed"
     REDIS_CONN_SUCCESS = "Connection to redis server succeeded"
-    RETRY_TOO_SOON = "Tried to reconnect too soon"
+    RETRY_TOO_SOON = "Redis reconnect attempted too soon"
     CACHE_OUTDATED = "Cache is outdated"
     CACHE_INVALID = "Cache is invalid or malformed"
 
@@ -17,13 +17,12 @@ class CacheServiceError(Exception):
     """Raised when cache service operations fail."""
 
 class CacheService:
-    """Handles temperature data caching and retrieval."""
+    """Handles temperature data cache updating & retrieval."""
 
     def __init__(self, dsn: str, redis_config: dict):
         self.dsn = dsn
         self.cfg = redis_config
         self.tag = "temp:latest"
-        self.client = None
         self.last_retry = None
         self.client = Redis.from_url(self.dsn, **self.cfg)
 
