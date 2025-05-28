@@ -54,10 +54,11 @@ class Settings(BaseSettings):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        s3_config = Settings().s3_config.model_dump(mode="json")
-        s3_endpoint_url = Settings().s3_endpoint_url
-        redis_config = Settings().redis_config.model_dump(mode="json")
-        redis_dsn = str(Settings().redis_url)
+        settings = Settings()
+        s3_config = settings.s3_config.model_dump(mode="json")
+        s3_endpoint_url = settings.s3_endpoint_url
+        redis_config = settings.redis_config.model_dump(mode="json")
+        redis_dsn = str(settings.redis_url)
     except ValidationError as e:
         print(f"❌ Config validation error: {e}", flush=True)
         raise
@@ -66,7 +67,7 @@ async def lifespan(app: FastAPI):
         try:
             await app.state.store_svc.connect()
         except Exception:
-            raise
+            pass
     except Exception:
         raise
     try:
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI):
         try:
             await app.state.cache_svc.connect()
         except CacheServiceError:
-            print(CacheMessages.REDIS_CONN_FAIL, flush=True)
+            pass
     except Exception:
         raise
     yield
