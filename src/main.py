@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException
 from pydantic import AliasChoices, BaseModel, Field, RedisDsn, ValidationError, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from hivebox.cache import CacheService, CacheMessages, CacheServiceError
-from hivebox.store import StorageMessages, StorageService
+from hivebox.cache import CacheService, CacheServiceError
+from hivebox.store import StorageService
 from hivebox import __version__
 from hivebox.temperature import TemperatureService, TemperatureServiceError, TemperatureResult
 from hivebox import SENSEBOX_TEMP_SENSORS as SB_SENS
