@@ -7,6 +7,7 @@ from redis.exceptions import ConnectionError
 from hivebox.temperature import TemperatureResult
 
 class CacheMessages:
+    """Static message strings."""
     REDIS_CONN_FAIL = "Connection to redis server failed"
     REDIS_CONN_SUCCESS = "Connection to redis server succeeded"
     RETRY_TOO_SOON = "Redis reconnect attempted too soon"
