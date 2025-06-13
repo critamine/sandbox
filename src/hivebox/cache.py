@@ -1,9 +1,10 @@
 """Redis caching module."""
 
 import time
+import asyncio
 from pydantic import ValidationError
 from redis.asyncio import Redis
-from redis.exceptions import ConnectionError
+from redis.exceptions import RedisError
 from hivebox.temperature import TemperatureResult
 
 class CacheMessages:
@@ -27,7 +28,7 @@ class CacheService:
         self.last_retry = None
         self.client = Redis.from_url(self.dsn, **self.cfg)
 
-    async def connect(self):
+    async def connect(self) -> None:
         now = int(time.time())
         if self.last_retry is not None:
             delta = now - self.last_retry
@@ -37,35 +38,36 @@ class CacheService:
         try:
             await self.client.ping()
             print(CacheMessages.REDIS_CONN_SUCCESS, flush=True)
-        except ConnectionError:
-            print(CacheMessages.REDIS_CONN_FAIL, flush=True)
+        except RedisError as e:
+            raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL) from e
 
     async def _check(self, cache: TemperatureResult):
         now = int(time.time())
         return (now - cache.timestamp) < 3600
 
-    async def fetch(self):
-        try:
+    async def _with_retry(self, op, *args, **kwargs):
+        for attempt in (1, 2):
             try:
-                raw = await self.client.get(self.tag)
-            except ConnectionError:
-                await self.connect()
-                raw = await self.client.get(self.tag)
-        except ConnectionError:
-            raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL)
+                return await op(*args, **kwargs)
+            except (ConnectionError, RedisError, asyncio.CancelledError) as e:
+                if attempt == 1:
+                    await self.connect()
+                    continue
+                raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL) from e
+    
+    async def fetch(self) -> TemperatureResult:
+        raw = await self._with_retry(self.client.get, self.tag)
+
         try:
             cache = TemperatureResult.model_validate_json(raw)
         except ValidationError:
             raise CacheServiceError(CacheMessages.CACHE_INVALID)
+
         if await self._check(cache):
             return cache
-        else:
-            raise CacheServiceError(CacheMessages.CACHE_OUTDATED)
 
-    async def update(self, result: TemperatureResult):
+        raise CacheServiceError(CacheMessages.CACHE_OUTDATED)
+
+    async def update(self, result: TemperatureResult) -> None:
         serialized = result.model_dump_json()
-        try:
-            await self.client.set(self.tag, serialized)
-        except ConnectionError:
-            await self.connect()
-            await self.client.set(self.tag, serialized)
+        await self._with_retry(self.client.set, self.tag, serialized)

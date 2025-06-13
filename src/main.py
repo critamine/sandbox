@@ -1,73 +1,76 @@
 """Main entry point for the application."""
 
 import prometheus_client
-from typing import Optional
-from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request, Response, HTTPException
-from pydantic import AliasChoices, BaseModel, Field, RedisDsn, ValidationError, HttpUrl
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from hivebox.config import get_settings
 from hivebox.cache import CacheService, CacheServiceError
-from hivebox.store import StorageService
+from hivebox.store import StorageService, StorageServiceError
 from hivebox import __version__
-from hivebox.temperature import TemperatureService, TemperatureServiceError, TemperatureResult
+from hivebox.temperature import (
+    TemperatureService,
+    TemperatureServiceError,
+    TemperatureResult,
+)
 from hivebox import SENSEBOX_TEMP_SENSORS as SB_SENS
 
-class RedisConfig(BaseModel):
-    encoding: str
-    decode_responses: bool
-    socket_connect_timeout: Optional[int] = None
-    retry_on_timeout: Optional[bool] = None
-    socket_timeout: Optional[int] = None
+sched = AsyncIOScheduler()
 
-class BotoS3Config(BaseModel):
-    aws_access_key_id: str
-    aws_secret_access_key: str
-    verify: bool = True
-    use_ssl: bool = True
-    aws_session_token: Optional[str] = None
+async def poll(job_id: str):
+    try:
+        result = await app.state.store_svc.get_stored_temperature()
+        if result is None:
+            last_temp, age = None, None
+        else:
+            last_temp, age = result
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file='../.env', 
-        env_file_encoding='utf-8', 
-        extra='ignore'
+        if last_temp is not None and age < 300:
+            next_delay = 300 - age
+        else:
+            temp_svc = TemperatureService(SB_SENS)
+            new_temp = temp_svc.get_average_temperature()
+            await app.state.store_svc.store_temperature_result(new_temp)
+            with suppress(CacheServiceError):
+                await app.state.cache_svc.update(new_temp)
+            next_delay = 300
+            print("Delay set", flush=True)
+    except Exception:
+        raise
+
+    sched.reschedule_job(
+        job_id,
+        trigger=IntervalTrigger(seconds=next_delay)
     )
-    redis_url: RedisDsn = Field(
-        'redis://localhost:6379/0',
-        validation_alias=AliasChoices('REDIS_URL'),
-    )
-    redis_config: RedisConfig = Field(
-        {
-            "encoding": "utf-8",
-            "decode_responses": True,
-        },
-        validation_alias=AliasChoices('REDIS_CFG'),
-    )
-    s3_endpoint_url: HttpUrl = Field(
-        'localhost:9000',
-        validation_alias=AliasChoices('MINIO_URL')
-    )
-    s3_config: BotoS3Config = Field(
-        validation_alias=AliasChoices('S3_CFG')
-    )
+
+job = sched.add_job(
+    poll,
+    IntervalTrigger(seconds=10),
+    args=[ "dynamic_poll" ],
+    id="dynamic_poll",
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
+    s3_config = settings.s3_config.model_dump(mode="json")
+    s3_endpoint_url = settings.s3_endpoint_url
+    s3_bucket = settings.s3_bucket
+    b3_config = settings.boto3_config.model_dump(mode="json")
+    redis_config = settings.redis_config.model_dump(mode="json")
+    redis_dsn = str(settings.redis_url)
     try:
-        settings = Settings()
-        s3_config = settings.s3_config.model_dump(mode="json")
-        s3_endpoint_url = settings.s3_endpoint_url
-        redis_config = settings.redis_config.model_dump(mode="json")
-        redis_dsn = str(settings.redis_url)
-    except ValidationError as e:
-        print(f"❌ Config validation error: {e}", flush=True)
-        raise
-    try:
-        app.state.store_svc = StorageService(s3_endpoint_url, s3_config)
+        app.state.store_svc = StorageService(
+            s3_endpoint_url,
+            s3_config,
+            b3_config,
+            s3_bucket,
+        )
         try:
             await app.state.store_svc.connect()
         except Exception:
-            pass
+            raise
     except Exception:
         raise
     try:
@@ -75,22 +78,28 @@ async def lifespan(app: FastAPI):
         try:
             await app.state.cache_svc.connect()
         except CacheServiceError:
-            pass
-    except Exception:
-        raise
+            raise
+    except Exception as e:
+        print(e, flush=True)
+    sched.start()
     yield
+    sched.shutdown()
+
 
 app = FastAPI(lifespan=lifespan)
+
 
 @app.get("/version")
 async def get_version():
     """Get hivebox version."""
     return {"hivebox": __version__}
 
+
 @app.get("/temperature", response_model=TemperatureResult)
 async def get_temperature(request: Request):
     temp_svc = TemperatureService(SB_SENS)
     cache_svc = app.state.cache_svc
+    store_svc = app.state.store_svc
     try:
         cache = await cache_svc.fetch()
         return cache
@@ -103,21 +112,27 @@ async def get_temperature(request: Request):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     try:
+        await store_svc.store_temperature_result(result)
+    except StorageServiceError as e:
+        print(f"Store update error: {e}")
+
+    try:
         await cache_svc.update(result)
     except CacheServiceError as e:
         print(f"Cache update error: {e}")
 
     return result
 
+
 @app.get("/metrics")
 async def metrics():
     """Expose Prometheus metrics."""
     return Response(
-        content=prometheus_client.generate_latest(),
-        media_type="text/plain"
+        content=prometheus_client.generate_latest(), media_type="text/plain"
     )
 
-if __name__ == "__main__": # pragma: no cover
+
+if __name__ == "__main__":  # pragma: no cover
     """Start Uvicorn locally; prod uses Docker CMD."""
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000, log_level="trace")
