@@ -46,7 +46,7 @@ async def poll(job_id: str):
 
 job = sched.add_job(
     poll,
-    IntervalTrigger(seconds=10),
+    IntervalTrigger(seconds=30),
     args=[ "dynamic_poll" ],
     id="dynamic_poll",
 )
