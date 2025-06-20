@@ -21,7 +21,6 @@ class BotoCoreCfg(BaseModel):
     read_timeout: int = 5
     retries: RetryCfg = Field(default_factory=RetryCfg)
 
-
 class BotoS3Config(BaseModel):
     aws_access_key_id: str
     aws_secret_access_key: str
@@ -63,7 +62,6 @@ class Settings(BaseSettings):
         ...,
         validation_alias=AliasChoices("BOTO3_CFG")
     )
-
 
 @lru_cache
 def get_settings() -> Settings:

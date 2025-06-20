@@ -4,7 +4,7 @@ import prometheus_client
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager, suppress
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Request, Response, HTTPException
 from hivebox.config import get_settings
 from hivebox.cache import CacheService, CacheServiceError
 from hivebox.store import StorageService, StorageServiceError
@@ -51,6 +51,12 @@ job = sched.add_job(
     id="dynamic_poll",
 )
 
+async def safe_cache_update(cache_svc, result):
+    try:
+        await cache_svc.update(result)
+    except Exception as e:
+        print(f"Cache update error: {e}", flush=True)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -85,18 +91,15 @@ async def lifespan(app: FastAPI):
     yield
     sched.shutdown()
 
-
 app = FastAPI(lifespan=lifespan)
-
 
 @app.get("/version")
 async def get_version():
     """Get hivebox version."""
     return {"hivebox": __version__}
 
-
 @app.get("/temperature", response_model=TemperatureResult)
-async def get_temperature(request: Request):
+async def get_temperature(request: Request, background_tasks: BackgroundTasks):
     temp_svc = TemperatureService(SB_SENS)
     cache_svc = app.state.cache_svc
     store_svc = app.state.store_svc
@@ -116,13 +119,9 @@ async def get_temperature(request: Request):
     except StorageServiceError as e:
         print(f"Store update error: {e}")
 
-    try:
-        await cache_svc.update(result)
-    except CacheServiceError as e:
-        print(f"Cache update error: {e}")
+    background_tasks.add_task(safe_cache_update, cache_svc, result)
 
     return result
-
 
 @app.get("/metrics")
 async def metrics():
@@ -130,7 +129,6 @@ async def metrics():
     return Response(
         content=prometheus_client.generate_latest(), media_type="text/plain"
     )
-
 
 if __name__ == "__main__":  # pragma: no cover
     """Start Uvicorn locally; prod uses Docker CMD."""
