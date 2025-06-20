@@ -9,8 +9,6 @@ services:
       - minio
     ports:
       - "8000:8000"
-    extra_hosts:
-      - "redis:172.20.0.10"
 
   redis:
     image: redis:7.4.3-alpine
