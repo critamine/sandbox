@@ -123,6 +123,25 @@ async def get_temperature(request: Request, background_tasks: BackgroundTasks):
 
     return result
 
+@app.get("/store")
+async def store_temperature(request: Request, background_tasks: BackgroundTasks):
+    temp_svc = TemperatureService(SB_SENS)
+    cache_svc = app.state.cache_svc
+    store_svc = app.state.store_svc
+    try:
+        result = temp_svc.get_average_temperature()
+    except TemperatureServiceError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    
+    try:
+        await store_svc.store_temperature_result(result)
+    except StorageServiceError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    background_tasks.add_task(safe_cache_update, cache_svc, result)
+
+    return {"status": "OK"}
+
 @app.get("/metrics")
 async def metrics():
     """Expose Prometheus metrics."""
