@@ -1,6 +1,7 @@
 """Main entry point for the application."""
 
 import logging
+import sys
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager, suppress
@@ -19,36 +20,41 @@ from hivebox.metrics import (
     router as metrics_router
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+)
 logger = logging.getLogger(__name__)
 
 sched = AsyncIOScheduler()
 
 async def poll(job_id: str):
+    """Periodically fetches and stores temperature data."""
     mode = "auto"
-    try:
-        result = await app.state.store_svc.get_stored_temperature(mode)
-        if result is None:
-            last_temp, age = None, None
-        else:
-            last_temp, age = result
+    next_delay = 300
 
-        if last_temp is not None and age < 300:
+    try:
+        last_temp, age = (None, None)
+        try:
+            last_temp, age = await app.state.store_svc.get_stored_temperature(mode)
+        except StorageServiceError as e:
+            logger.info("S3 data not available, proceeding to poll for new data: %s", e)
+
+        if last_temp and age < 300:
             next_delay = 300 - age
+            logger.info("S3 data is fresh. Next poll in %s seconds.", next_delay)
         else:
+            logger.info("Polling for new temperature data...")
             temp_svc = TemperatureService(SB_SENS)
             new_temp = temp_svc.get_average_temperature(mode)
             await app.state.store_svc.store_temperature_result(new_temp, mode)
-            with suppress(CacheServiceError):
-                await app.state.cache_svc.update(new_temp, mode)
-            next_delay = 300
-            print("Delay set", flush=True)
-    except Exception:
-        raise
-
-    sched.reschedule_job(
-        job_id,
-        trigger=IntervalTrigger(seconds=next_delay)
-    )
+            await safe_cache_update(app.state.cache_svc, new_temp, mode)
+            logger.info("Successfully polled and updated stores. Next poll in %s seconds.", next_delay)
+    except (TemperatureServiceError, StorageServiceError) as e:
+        logger.error("Polling job '%s' failed during data fetch/store: %s", job_id, e, exc_info=True)
+    finally:
+        sched.reschedule_job(job_id, trigger=IntervalTrigger(seconds=next_delay))
 
 job = sched.add_job(
     poll,
