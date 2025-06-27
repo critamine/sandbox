@@ -4,7 +4,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager, suppress
-from fastapi import BackgroundTasks, FastAPI, Request, Response, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Request, Response, HTTPException, Depends
 from hivebox.config import get_settings
 from hivebox.cache import CacheService, CacheServiceError
 from hivebox.store import StorageService, StorageServiceError
@@ -116,12 +116,23 @@ async def get_version():
     """Get hivebox version."""
     return {"hivebox": __version__}
 
+def get_cache_svc(request: Request) -> CacheService:
+    """Dependency to get the cache service."""
+    return request.app.state.cache_svc
+
+def get_store_svc(request: Request) -> StorageService:
+    """Dependency to get the storage service."""
+    return request.app.state.store_svc
+
 @app.get("/temperature", response_model=TemperatureResult)
-async def get_temperature(request: Request, background_tasks: BackgroundTasks):
+async def get_temperature(
+    background_tasks: BackgroundTasks,
+    cache_svc: CacheService = Depends(get_cache_svc),
+    store_svc: StorageService = Depends(get_store_svc),
+):
     mode = "manual"
     temp_svc = TemperatureService(SB_SENS)
-    cache_svc = app.state.cache_svc
-    store_svc = app.state.store_svc
+
     try:
         cache = await cache_svc.fetch(mode)
         return cache
@@ -137,7 +148,6 @@ async def get_temperature(request: Request, background_tasks: BackgroundTasks):
     try:
         await store_svc.store_temperature_result(result, mode)
     except StorageServiceError as e:
-        # This is a non-critical error for this endpoint, log it but don't fail the request.
         logger.warning("Failed to store temperature result on manual GET: %s", e, exc_info=True)
 
     background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
@@ -145,11 +155,13 @@ async def get_temperature(request: Request, background_tasks: BackgroundTasks):
     return result
 
 @app.get("/store")
-async def store_temperature(request: Request, background_tasks: BackgroundTasks):
+async def store_temperature(
+    background_tasks: BackgroundTasks,
+    cache_svc: CacheService = Depends(get_cache_svc),
+    store_svc: StorageService = Depends(get_store_svc),
+):
     mode = "manual"
     temp_svc = TemperatureService(SB_SENS)
-    cache_svc = app.state.cache_svc
-    store_svc = app.state.store_svc
     try:
         result = temp_svc.get_average_temperature(mode)
     except TemperatureServiceError as e:
