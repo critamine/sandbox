@@ -1,6 +1,6 @@
 """Main entry point for the application."""
 
-import prometheus_client
+import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager, suppress
@@ -8,19 +8,25 @@ from fastapi import BackgroundTasks, FastAPI, Request, Response, HTTPException
 from hivebox.config import get_settings
 from hivebox.cache import CacheService, CacheServiceError
 from hivebox.store import StorageService, StorageServiceError
-from hivebox import __version__
+from hivebox import __version__, SENSEBOX_TEMP_SENSORS as SB_SENS
 from hivebox.temperature import (
     TemperatureService,
     TemperatureServiceError,
     TemperatureResult,
 )
-from hivebox import SENSEBOX_TEMP_SENSORS as SB_SENS
+from hivebox.metrics import (
+    REQUESTS,
+    router as metrics_router
+)
+
+logger = logging.getLogger(__name__)
 
 sched = AsyncIOScheduler()
 
 async def poll(job_id: str):
+    mode = "auto"
     try:
-        result = await app.state.store_svc.get_stored_temperature()
+        result = await app.state.store_svc.get_stored_temperature(mode)
         if result is None:
             last_temp, age = None, None
         else:
@@ -30,10 +36,10 @@ async def poll(job_id: str):
             next_delay = 300 - age
         else:
             temp_svc = TemperatureService(SB_SENS)
-            new_temp = temp_svc.get_average_temperature()
-            await app.state.store_svc.store_temperature_result(new_temp)
+            new_temp = temp_svc.get_average_temperature(mode)
+            await app.state.store_svc.store_temperature_result(new_temp, mode)
             with suppress(CacheServiceError):
-                await app.state.cache_svc.update(new_temp)
+                await app.state.cache_svc.update(new_temp, mode)
             next_delay = 300
             print("Delay set", flush=True)
     except Exception:
@@ -46,14 +52,14 @@ async def poll(job_id: str):
 
 job = sched.add_job(
     poll,
-    IntervalTrigger(seconds=30),
+    IntervalTrigger(seconds=10),
     args=[ "dynamic_poll" ],
     id="dynamic_poll",
 )
 
-async def safe_cache_update(cache_svc, result):
+async def safe_cache_update(cache_svc, result, mode: str):
     try:
-        await cache_svc.update(result)
+        await cache_svc.update(result, mode)
     except Exception as e:
         print(f"Cache update error: {e}", flush=True)
 
@@ -92,6 +98,18 @@ async def lifespan(app: FastAPI):
     sched.shutdown()
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(metrics_router)
+
+@app.middleware("http")
+async def count_requests(request: Request, call_next):
+    resp: Response = await call_next(request)
+    if request.url.path != "/metrics":
+        REQUESTS.labels(
+            request.url.path,
+            request.method,
+            resp.status_code
+        ).inc()
+    return resp
 
 @app.get("/version")
 async def get_version():
@@ -100,54 +118,53 @@ async def get_version():
 
 @app.get("/temperature", response_model=TemperatureResult)
 async def get_temperature(request: Request, background_tasks: BackgroundTasks):
+    mode = "manual"
     temp_svc = TemperatureService(SB_SENS)
     cache_svc = app.state.cache_svc
     store_svc = app.state.store_svc
     try:
-        cache = await cache_svc.fetch()
+        cache = await cache_svc.fetch(mode)
         return cache
     except CacheServiceError as e:
         print(f"Cache fetch error: {e}")
 
     try:
-        result = temp_svc.get_average_temperature()
+        result = temp_svc.get_average_temperature(mode)
     except TemperatureServiceError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error("Failed to get average temperature: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not retrieve temperature data from sensors.") from e
 
     try:
-        await store_svc.store_temperature_result(result)
+        await store_svc.store_temperature_result(result, mode)
     except StorageServiceError as e:
-        print(f"Store update error: {e}")
+        # This is a non-critical error for this endpoint, log it but don't fail the request.
+        logger.warning("Failed to store temperature result on manual GET: %s", e, exc_info=True)
 
-    background_tasks.add_task(safe_cache_update, cache_svc, result)
+    background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
 
     return result
 
 @app.get("/store")
 async def store_temperature(request: Request, background_tasks: BackgroundTasks):
+    mode = "manual"
     temp_svc = TemperatureService(SB_SENS)
     cache_svc = app.state.cache_svc
     store_svc = app.state.store_svc
     try:
-        result = temp_svc.get_average_temperature()
+        result = temp_svc.get_average_temperature(mode)
     except TemperatureServiceError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error("Failed to get average temperature for storing: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not retrieve temperature data from sensors.") from e
     
     try:
-        await store_svc.store_temperature_result(result)
+        await store_svc.store_temperature_result(result, mode)
     except StorageServiceError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error("Failed to store temperature result: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to store temperature data.") from e
 
-    background_tasks.add_task(safe_cache_update, cache_svc, result)
+    background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
 
     return {"status": "OK"}
-
-@app.get("/metrics")
-async def metrics():
-    """Expose Prometheus metrics."""
-    return Response(
-        content=prometheus_client.generate_latest(), media_type="text/plain"
-    )
 
 if __name__ == "__main__":  # pragma: no cover
     """Start Uvicorn locally; prod uses Docker CMD."""

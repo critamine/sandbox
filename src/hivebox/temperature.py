@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Dict
 import requests
 from . import get_sensor_data
+from .metrics import OPENSENSEMAP_CALLS
 from pydantic import BaseModel
 
 
@@ -36,9 +37,9 @@ class TemperatureService:
             raise TemperatureServiceError("No sensor data provided")
         self.sensor_data = sensor_data
 
-    def get_average_temperature(self) -> TemperatureResult:
+    def get_average_temperature(self, mode: str) -> TemperatureResult:
         """Calculate and return average temperature from all sensor readings."""
-        readings = self._fetch_readings()
+        readings = self._fetch_readings(mode=mode)
         if not readings:
             raise TemperatureServiceError("No readings available")
                
@@ -48,7 +49,7 @@ class TemperatureService:
 
         return TemperatureResult(value=avg_temp, status=status, timestamp=computed_at)
 
-    def _fetch_readings(self) -> List[SensorReading]:
+    def _fetch_readings(self, mode: str) -> List[SensorReading]:
         """Fetch current readings from all sensors that are less than 1 hour old."""
         readings = []
         current_time = datetime.now(timezone.utc)
@@ -56,8 +57,8 @@ class TemperatureService:
         for box_id, sensor_id in self.sensor_data.items():
             url = get_sensor_data(box_id, sensor_id)
             try:
-                response = requests.get(url, timeout=30)
-                data = response.json()
+                resp = requests.get(url, timeout=30)
+                data = resp.json()
                 reading_time = datetime.fromisoformat(
                     data['lastMeasurement']['createdAt'].replace('Z', '+00:00'))
                 time_diff = current_time - reading_time
@@ -65,18 +66,30 @@ class TemperatureService:
                 if time_diff.total_seconds() > 3600:
                     continue
 
+                OPENSENSEMAP_CALLS.labels(
+                    sensebox_id=box_id, result="success", mode=mode).inc()
+
                 reading = SensorReading(
                     timestamp=reading_time,
                     value=float(data['lastMeasurement']['value']),
                     sensor_id=sensor_id)
                 readings.append(reading)
 
-            except requests.RequestException as e:
-                raise TemperatureServiceError(
-                    f"Failed to fetch data for sensor {sensor_id}: {str(e)}") from e
-            except ValueError as e:
-                raise TemperatureServiceError(
-                    f"Invalid data received from sensor {sensor_id}: {str(e)}") from e
+            except Exception as e:
+                OPENSENSEMAP_CALLS.labels(
+                    sensebox_id=box_id, result="error", mode=mode).inc()
+                if isinstance(e, requests.RequestException):
+                    raise TemperatureServiceError(
+                        f"Failed to fetch data for sensor {sensor_id}: {str(e)}"
+                    ) from e
+                elif isinstance(e, (ValueError, KeyError)):
+                    raise TemperatureServiceError(
+                        f"Invalid data received from sensor {sensor_id}: {str(e)}"
+                    ) from e
+                else:
+                    raise TemperatureServiceError(
+                        f"Unexpected error for sensor {sensor_id}: {str(e)}"
+                    ) from e
 
         if not readings:
             raise TemperatureServiceError("All available readings are over 1 hour old")

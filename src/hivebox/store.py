@@ -3,6 +3,7 @@
 import datetime as dt
 import aioboto3
 from pydantic import HttpUrl
+from hivebox.metrics import S3_CALLS
 from botocore.exceptions import EndpointConnectionError
 from botocore.config import Config
 from hivebox.temperature import TemperatureResult
@@ -10,10 +11,9 @@ from hivebox.temperature import TemperatureResult
 
 class StorageMessages:
     """Static message strings."""
-
     S3_CONN_FAIL = "Connection to S3 server failed"
     S3_CONN_SUCCESS = "Connection to S3 server succeeded"
-    S3_UPLOAD_FAIL = "latest.json upload to S3 server failed"
+    S3_UPLOAD_FAIL = "Upload to S3 server failed"
     S3_FETCH_FAIL = "Fetch from S3 server failed"
     RETRY_TOO_SOON = "S3 reconnect attempted too soon"
 
@@ -66,40 +66,69 @@ class StorageService:
             self.client = None
             raise StorageServiceError(StorageMessages.S3_CONN_FAIL) from e
 
+    async def _s3_call(self, s3_method, mode: str, operation: str, *args, **kwargs):
+        """
+        Wrapper for S3 client calls to centralize metric collection.
+        Increments S3_CALLS metric based on success or failure.
+        """
+        try:
+            result = await s3_method(*args, **kwargs)
+            S3_CALLS.labels(mode=mode, operation=operation, result="success").inc()
+            return result
+        except Exception as e:
+            S3_CALLS.labels(mode=mode, operation=operation, result="error").inc()
+            raise e
     async def _verify_bucket_access(self):
         try:
-            await self.client.head_bucket(Bucket=self.bucket)
+            await self._s3_call(
+                self.client.head_bucket,
+                mode="connect",
+                operation="head",
+                Bucket=self.bucket
+            )
 
             test_key = "__health_check.txt"
             payload  = b"ping"
 
-            put_resp = await self.client.put_object(
+            put_resp = await self._s3_call(
+                self.client.put_object,
+                mode="connect",
+                operation="put",
                 Bucket=self.bucket,
                 Key=test_key,
                 Body=payload
             )
             assert put_resp["ResponseMetadata"]["HTTPStatusCode"] == 200
 
-            get_resp = await self.client.get_object(
+            get_resp = await self._s3_call(
+                self.client.get_object,
+                mode="connect",
+                operation="get",
                 Bucket=self.bucket,
                 Key=test_key
             )
             assert await get_resp["Body"].read() == payload
 
-            del_resp = await self.client.delete_object(
+            del_resp = await self._s3_call(
+                self.client.delete_object,
+                mode="connect",
+                operation="delete",
                 Bucket=self.bucket,
                 Key=test_key
             )
             assert del_resp["ResponseMetadata"]["HTTPStatusCode"] in (200, 204)
 
         except Exception:
-            print("Failed verify", flush=True)
+            print("Failed to verify S3 bucket access", flush=True)
             raise
 
-    async def store_temperature_result(self, temp: TemperatureResult):
+    async def store_temperature_result(self, temp: TemperatureResult, mode: str):
         json_payload = temp.model_dump_json().encode()
         try:
-            await self.client.put_object(
+            await self._s3_call(
+                self.client.put_object,
+                mode=mode,
+                operation="put",
                 Bucket=self.bucket,
                 Key=self.latest_key,
                 Body=json_payload,
@@ -107,16 +136,22 @@ class StorageService:
             )
         except Exception as e:
             raise StorageServiceError(f"{StorageMessages.S3_UPLOAD_FAIL}: {e}")
-    
-    async def get_stored_temperature(self):
+
+    async def get_stored_temperature(self, mode: str):
         try:
-            resp = await self.client.get_object(
+            resp = await self._s3_call(
+                self.client.get_object,
+                mode=mode,
+                operation="get",
                 Bucket=self.bucket,
                 Key=self.latest_key
             )
         except EndpointConnectionError:
             await self.connect()
-            resp = await self.client.get_object(
+            resp = await self._s3_call(
+                self.client.get_object,
+                mode=mode,
+                operation="get",
                 Bucket=self.bucket,
                 Key=self.latest_key
             )
@@ -127,5 +162,6 @@ class StorageService:
             age = int((dt.datetime.now(ts.tzinfo) - ts).total_seconds())
             if age < 3600:
                 return model, age
+            raise StorageServiceError(StorageMessages.S3_FETCH_FAIL)
         except Exception:
             raise StorageServiceError(StorageMessages.S3_FETCH_FAIL)
