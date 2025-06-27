@@ -4,7 +4,7 @@ import logging
 import sys
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, FastAPI, Request, Response, HTTPException, Depends
 from hivebox.config import get_settings
 from hivebox.cache import CacheService, CacheServiceError
@@ -16,8 +16,9 @@ from hivebox.temperature import (
     TemperatureResult,
 )
 from hivebox.metrics import (
+    router as metrics_router,
     REQUESTS,
-    router as metrics_router
+    CACHED_TEMPERATURE,
 )
 
 logging.basicConfig(
@@ -63,9 +64,10 @@ job = sched.add_job(
     id="dynamic_poll",
 )
 
-async def safe_cache_update(cache_svc, result, mode: str):
+async def safe_cache_update(cache_svc, result: TemperatureResult, mode: str):
     try:
         await cache_svc.update(result, mode)
+        CACHED_TEMPERATURE.labels(status=result.status).set(result.value)
     except Exception as e:
         print(f"Cache update error: {e}", flush=True)
 

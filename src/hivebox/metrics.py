@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Response
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 REQUESTS = Counter(
     "hivebox_requests_total",
@@ -29,6 +29,12 @@ REDIS_CALLS = Counter(
     "hivebox_redis_calls_total",
     "Number of Redis operations",
     ["mode", "operation", "result"]
+)
+
+CACHED_TEMPERATURE = Gauge(
+    "hivebox_cached_temperature_celsius",
+    "Last temperature cached to redis",
+    ["status"],
 )
 
 router = APIRouter()
