@@ -67,7 +67,7 @@ job = sched.add_job(
 async def safe_cache_update(cache_svc, result: TemperatureResult, mode: str):
     try:
         await cache_svc.update(result, mode)
-        CACHED_TEMPERATURE.labels(status=result.status).set(result.value)
+        CACHED_TEMPERATURE.set(result.value)
     except Exception as e:
         print(f"Cache update error: {e}", flush=True)
 

@@ -34,7 +34,6 @@ REDIS_CALLS = Counter(
 CACHED_TEMPERATURE = Gauge(
     "hivebox_cached_temperature_celsius",
     "Last temperature cached to redis",
-    ["status"],
 )
 
 router = APIRouter()
