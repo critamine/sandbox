@@ -1,11 +1,12 @@
 """Temperature data processing module."""
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List, Dict
 import requests
 from . import get_sensor_data
-from .metrics import OPENSENSEMAP_CALLS
+from .metrics import OPENSENSEMAP_CALLS, OPENSENSEMAP_LATENCY
 from pydantic import BaseModel
 
 
@@ -56,6 +57,7 @@ class TemperatureService:
 
         for box_id, sensor_id in self.sensor_data.items():
             url = get_sensor_data(box_id, sensor_id)
+            start_time = time.time()
             try:
                 resp = requests.get(url, timeout=30)
                 data = resp.json()
@@ -90,6 +92,9 @@ class TemperatureService:
                     raise TemperatureServiceError(
                         f"Unexpected error for sensor {sensor_id}: {str(e)}"
                     ) from e
+            finally:
+                latency = time.time() - start_time
+                OPENSENSEMAP_LATENCY.labels(sensebox_id=box_id).observe(latency)
 
         if not readings:
             raise TemperatureServiceError("All available readings are over 1 hour old")

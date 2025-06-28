@@ -82,7 +82,9 @@ class CacheService:
         except ValidationError:
             raise CacheServiceError(CacheMessages.CACHE_INVALID)
 
-        if (int(time.time()) - cache.timestamp) < 3600:
+        age = int(time.time()) - cache.timestamp
+
+        if age < 3600:
             return cache
 
         raise CacheServiceError(CacheMessages.CACHE_OUTDATED)

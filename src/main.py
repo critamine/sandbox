@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import time
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
@@ -18,7 +19,9 @@ from hivebox.temperature import (
 from hivebox.metrics import (
     router as metrics_router,
     REQUESTS,
+    REQUEST_LATENCY,
     CACHED_TEMPERATURE,
+    CACHE_TIMESTAMP,
 )
 
 logging.basicConfig(
@@ -44,14 +47,15 @@ async def poll(job_id: str):
 
         if last_temp and age < 300:
             next_delay = 300 - age
-            logger.info("S3 data is fresh. Next poll in %s seconds.", next_delay)
+            logger.info("S3 data is fresh. Hydrating cache. Next poll in %s seconds.", next_delay)
+            await safe_cache_update(app.state.cache_svc, last_temp, mode)
         else:
             logger.info("Polling for new temperature data...")
             temp_svc = TemperatureService(SB_SENS)
             new_temp = temp_svc.get_average_temperature(mode)
             await app.state.store_svc.store_temperature_result(new_temp, mode)
             await safe_cache_update(app.state.cache_svc, new_temp, mode)
-            logger.info("Successfully polled and updated stores. Next poll in %s seconds.", next_delay)
+            logger.info("Polled and updated stores. Next poll in %s seconds.", next_delay)
     except (TemperatureServiceError, StorageServiceError) as e:
         logger.error("Polling job '%s' failed during data fetch/store: %s", job_id, e, exc_info=True)
     finally:
@@ -68,6 +72,7 @@ async def safe_cache_update(cache_svc, result: TemperatureResult, mode: str):
     try:
         await cache_svc.update(result, mode)
         CACHED_TEMPERATURE.set(result.value)
+        CACHE_TIMESTAMP.set(result.timestamp)
     except Exception as e:
         print(f"Cache update error: {e}", flush=True)
 
@@ -97,6 +102,17 @@ async def lifespan(app: FastAPI):
         app.state.cache_svc = CacheService(redis_dsn, redis_config)
         try:
             await app.state.cache_svc.connect()
+            try:
+                # Prime the metrics from the cache on startup
+                logger.info("Attempting to prime cache metrics on startup...")
+                cached_data = await app.state.cache_svc.fetch(mode="startup")
+                CACHED_TEMPERATURE.set(cached_data.value)
+                CACHE_TIMESTAMP.set(cached_data.timestamp)
+                logger.info("Successfully primed cache metrics.")
+            except CacheServiceError as e:
+                # Cache is empty, outdated, or unavailable.
+                # Metrics will be set on the first successful poll.
+                logger.warning("Could not prime cache metrics on startup: %s", e)
         except CacheServiceError:
             raise
     except Exception as e:
@@ -110,13 +126,16 @@ app.include_router(metrics_router)
 
 @app.middleware("http")
 async def count_requests(request: Request, call_next):
+    start_time = time.time()
     resp: Response = await call_next(request)
+    process_time_ms = (time.time() - start_time) * 1000
     if request.url.path != "/metrics":
         REQUESTS.labels(
             request.url.path,
             request.method,
             resp.status_code
         ).inc()
+        REQUEST_LATENCY.labels(request.url.path, request.method).observe(process_time_ms)
     return resp
 
 @app.get("/version")
