@@ -65,6 +65,12 @@ REDIS_LATENCY = Histogram(
     ["operation", "result"]
 )
 
+DEPENDENCY_RECONNECT_THROTTLED = Counter(
+    "hivebox_dependency_reconnect_throttled_total",
+    "Total times a dependency reconnect was throttled due to back-off",
+    ["dependency"]
+)
+
 CACHED_TEMPERATURE = Gauge(
     "hivebox_cached_temperature_celsius",
     "Value of last cached temperature",

@@ -4,7 +4,11 @@ import datetime as dt
 import time
 import aioboto3
 from pydantic import HttpUrl
-from hivebox.metrics import S3_CALLS, S3_LATENCY
+from hivebox.metrics import (
+    S3_CALLS,
+    S3_LATENCY,
+    DEPENDENCY_RECONNECT_THROTTLED,
+)
 from botocore.exceptions import EndpointConnectionError
 from botocore.config import Config
 from hivebox.temperature import TemperatureResult
@@ -47,6 +51,7 @@ class StorageService:
         """Lazy-open an async S3 client, respecting 5-min back-off."""
         now = int(dt.datetime.now().timestamp())
         if self.last_retry and (now - self.last_retry) < 300:
+            DEPENDENCY_RECONNECT_THROTTLED.labels(dependency="s3").inc()
             raise StorageServiceError(StorageMessages.RETRY_TOO_SOON)
         self.last_retry = now
 
