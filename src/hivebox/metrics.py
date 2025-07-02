@@ -50,6 +50,12 @@ REDIS_CALLS = Counter(
     ["mode", "operation", "result"]
 )
 
+REDIS_LATENCY = Histogram(
+    "hivebox_redis_latency_seconds",
+    "Latency of redis operations",
+    ["operation", "result"]
+)
+
 CACHED_TEMPERATURE = Gauge(
     "hivebox_cached_temperature_celsius",
     "Value of last cached temperature",

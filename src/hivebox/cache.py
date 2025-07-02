@@ -5,7 +5,7 @@ import asyncio
 from pydantic import ValidationError
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
-from hivebox.metrics import REDIS_CALLS
+from hivebox.metrics import REDIS_CALLS, REDIS_LATENCY
 from hivebox.temperature import TemperatureResult
 
 class CacheMessages:
@@ -38,17 +38,23 @@ class CacheService:
         **kwargs,
     ):
         """Central wrapper for Redis calls, adding retry on failure and incrementing metrics."""
-        for attempt in (1, 2):
-            try:
-                result = await redis_method(*args, **kwargs)
-                REDIS_CALLS.labels(mode=mode, operation=operation, result="success").inc()
-                return result
-            except (ConnectionError, RedisError, asyncio.CancelledError) as e:
-                REDIS_CALLS.labels(mode=mode, operation=operation, result="error").inc()
-                if attempt == 1:
-                    await self.connect()  # one reconnect try
-                    continue
-                raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL) from e
+        start_time = time.time()
+        redis_result = "error"
+        try:
+            for attempt in (1, 2):
+                try:
+                    response = await redis_method(*args, **kwargs)
+                    redis_result = "success"
+                    return response
+                except (ConnectionError, RedisError, asyncio.CancelledError) as e:
+                    if attempt == 1:
+                        await self.connect()  # one reconnect try
+                        continue
+                    raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL) from e
+        finally:
+            latency = time.time() - start_time
+            REDIS_CALLS.labels(mode=mode, operation=operation, result=redis_result).inc()
+            REDIS_LATENCY.labels(operation=operation, result=redis_result).observe(latency)
 
     async def connect(self) -> None:
         """(Re)initialise the Redis client, counted as a 'connect' operation."""
