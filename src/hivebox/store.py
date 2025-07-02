@@ -1,9 +1,10 @@
 """S3-compatible object-storage module (async)."""
 
 import datetime as dt
+import time
 import aioboto3
 from pydantic import HttpUrl
-from hivebox.metrics import S3_CALLS
+from hivebox.metrics import S3_CALLS, S3_LATENCY
 from botocore.exceptions import EndpointConnectionError
 from botocore.config import Config
 from hivebox.temperature import TemperatureResult
@@ -71,13 +72,18 @@ class StorageService:
         Wrapper for S3 client calls to centralize metric collection.
         Increments S3_CALLS metric based on success or failure.
         """
+        start_time = time.time()
+        s3_result = "success"
         try:
-            result = await s3_method(*args, **kwargs)
-            S3_CALLS.labels(mode=mode, operation=operation, result="success").inc()
-            return result
+            return await s3_method(*args, **kwargs)
         except Exception as e:
-            S3_CALLS.labels(mode=mode, operation=operation, result="error").inc()
+            s3_result = "error"
             raise e
+        finally:
+            latency = time.time() - start_time
+            S3_CALLS.labels(mode=mode, operation=operation, result=s3_result).inc()
+            S3_LATENCY.labels(operation=operation, result=s3_result).observe(latency)
+
     async def _verify_bucket_access(self):
         try:
             await self._s3_call(

@@ -9,8 +9,8 @@ REQUESTS = Counter(
 )
 
 REQUEST_LATENCY = Histogram(
-    "hivebox_http_latency_milliseconds",
-    "HTTP request latency in milliseconds",
+    "hivebox_http_latency_seconds",
+    "Latency of HTTP requests",
     ["endpoint", "method"]
 )
 
@@ -22,7 +22,7 @@ OPENSENSEMAP_CALLS = Counter(
 
 OPENSENSEMAP_LATENCY = Histogram(
     "hivebox_opensensemap_latency_seconds",
-    "Latency of openSenseMap API calls in seconds",
+    "Latency of openSenseMap API calls",
     ["sensebox_id"]
 )
 
@@ -30,6 +30,12 @@ S3_CALLS = Counter(
     "hivebox_s3_calls_total",
     "Number of store operations to S3",
     ["mode", "operation", "result"]
+)
+
+S3_LATENCY = Histogram(
+    "hivebox_s3_latency_seconds",
+    "Latency of S3 operations",
+    ["operation", "result"]
 )
 
 READYZ_CHECKS = Counter(
@@ -46,7 +52,7 @@ REDIS_CALLS = Counter(
 
 CACHED_TEMPERATURE = Gauge(
     "hivebox_cached_temperature_celsius",
-    "Last temperature cached to redis",
+    "Value of last cached temperature",
 )
 
 CACHE_TIMESTAMP = Gauge(
@@ -57,6 +63,12 @@ CACHE_TIMESTAMP = Gauge(
 CACHE_AGE = Gauge(
     "hivebox_cache_age_seconds",
     "Age of the temperature data in the cache in seconds",
+)
+
+POLL_JOB_DURATION = Histogram(
+    "hivebox_poll_job_duration_seconds",
+    "Duration of the poll job in seconds",
+    ["result"]
 )
 
 router = APIRouter()

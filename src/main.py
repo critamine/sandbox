@@ -22,6 +22,7 @@ from hivebox.metrics import (
     REQUEST_LATENCY,
     CACHED_TEMPERATURE,
     CACHE_TIMESTAMP,
+    POLL_JOB_DURATION,
 )
 
 logging.basicConfig(
@@ -35,9 +36,11 @@ sched = AsyncIOScheduler()
 
 async def poll(job_id: str):
     """Periodically fetches and stores temperature data."""
+    start_time = time.time()
     mode = "auto"
     next_delay = 300
-
+    result = "success"
+    
     try:
         last_temp, age = (None, None)
         try:
@@ -57,8 +60,11 @@ async def poll(job_id: str):
             await safe_cache_update(app.state.cache_svc, new_temp, mode)
             logger.info("Polled and updated stores. Next poll in %s seconds.", next_delay)
     except (TemperatureServiceError, StorageServiceError) as e:
+        result = "error"
         logger.error("Polling job '%s' failed during data fetch/store: %s", job_id, e, exc_info=True)
     finally:
+        duration = time.time() - start_time
+        POLL_JOB_DURATION.labels(result=result).observe(duration)
         sched.reschedule_job(job_id, trigger=IntervalTrigger(seconds=next_delay))
 
 job = sched.add_job(
@@ -103,15 +109,12 @@ async def lifespan(app: FastAPI):
         try:
             await app.state.cache_svc.connect()
             try:
-                # Prime the metrics from the cache on startup
                 logger.info("Attempting to prime cache metrics on startup...")
                 cached_data = await app.state.cache_svc.fetch(mode="startup")
                 CACHED_TEMPERATURE.set(cached_data.value)
                 CACHE_TIMESTAMP.set(cached_data.timestamp)
                 logger.info("Successfully primed cache metrics.")
             except CacheServiceError as e:
-                # Cache is empty, outdated, or unavailable.
-                # Metrics will be set on the first successful poll.
                 logger.warning("Could not prime cache metrics on startup: %s", e)
         except CacheServiceError:
             raise
