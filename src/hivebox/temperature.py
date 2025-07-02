@@ -6,7 +6,12 @@ from datetime import datetime, timezone
 from typing import List, Dict
 import requests
 from . import get_sensor_data
-from .metrics import OPENSENSEMAP_CALLS, OPENSENSEMAP_LATENCY
+from .metrics import (
+    OPENSENSEMAP_CALLS,
+    OPENSENSEMAP_LATENCY,
+    OPENSENSEMAP_AGE,
+    TEMPERATURE_SENSORS_USED,
+)
 from pydantic import BaseModel
 
 
@@ -43,6 +48,7 @@ class TemperatureService:
         readings = self._fetch_readings(mode=mode)
         if not readings:
             raise TemperatureServiceError("No readings available")
+        TEMPERATURE_SENSORS_USED.set(len(readings))
                
         avg_temp = round(sum(r.value for r in readings) / len(readings), 1)
         status = self._determine_temperature_status(avg_temp)
@@ -60,12 +66,20 @@ class TemperatureService:
             start_time = time.time()
             try:
                 resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
                 data = resp.json()
                 reading_time = datetime.fromisoformat(
                     data['lastMeasurement']['createdAt'].replace('Z', '+00:00'))
                 time_diff = current_time - reading_time
 
+                OPENSENSEMAP_AGE.labels(
+                    sensebox_id=box_id).observe(
+                        time_diff.total_seconds()
+                )
+
                 if time_diff.total_seconds() > 3600:
+                    OPENSENSEMAP_CALLS.labels(
+                        sensebox_id=box_id, result="stale", mode=mode).inc()
                     continue
 
                 OPENSENSEMAP_CALLS.labels(

@@ -26,6 +26,15 @@ OPENSENSEMAP_LATENCY = Histogram(
     ["sensebox_id"]
 )
 
+AGE_BUCKETS = (60, 120, 180, 240, 300)
+
+OPENSENSEMAP_AGE = Histogram(
+    "hivebox_opensensemap_reading_age_seconds",
+    "Age of openSenseMap readings in seconds",
+    ["sensebox_id"],
+    buckets=AGE_BUCKETS
+)
+
 S3_CALLS = Counter(
     "hivebox_s3_calls_total",
     "Number of store operations to S3",
@@ -69,6 +78,11 @@ CACHE_TIMESTAMP = Gauge(
 CACHE_AGE = Gauge(
     "hivebox_cache_age_seconds",
     "Age of the temperature data in the cache in seconds",
+)
+
+TEMPERATURE_SENSORS_USED = Gauge(
+    "hivebox_temperature_sensors_used_gauge",
+    "Number of sensors used in the last successful temperature calculation",
 )
 
 POLL_JOB_DURATION = Histogram(
