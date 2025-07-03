@@ -1,6 +1,7 @@
 import time
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, status
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from . import SENSEBOX_TEMP_SENSORS
 
 REQUESTS = Counter(
     "hivebox_requests_total",
@@ -91,6 +92,11 @@ TEMPERATURE_SENSORS_USED = Gauge(
     "Number of sensors used in the last successful temperature calculation",
 )
 
+UNREACHABLE_SENSORS = Gauge(
+    "hivebox_unreachable_sensors_total",
+    "Total number of unreachable sensors in the last poll",
+)
+
 POLL_JOB_DURATION = Histogram(
     "hivebox_poll_job_duration_seconds",
     "Duration of the poll job in seconds",
@@ -109,3 +115,30 @@ def metrics() -> Response:
         age = current_time - last_timestamp
         CACHE_AGE.set(age)
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+@router.get("/readyz")
+def readyz(response: Response):
+    """
+    Readiness probe. Returns 200 OK if the service is ready.
+
+    Returns 503 Service Unavailable if:
+    1. More than 50% of sensors are unreachable, AND
+    2. The cache is older than 5 minutes.
+    """
+    total_sensors = len(SENSEBOX_TEMP_SENSORS)
+    failure_threshold = (total_sensors // 2) + 1
+
+    unreachable_count = UNREACHABLE_SENSORS._value.get()
+    last_timestamp = CACHE_TIMESTAMP._value.get()
+    cache_age = time.time() - last_timestamp if last_timestamp > 0 else float('inf')
+
+    is_unhealthy = (unreachable_count >= failure_threshold and cache_age > 300)
+
+    if is_unhealthy:
+        reason = "quorum_lost_and_cache_stale"
+        READYZ_CHECKS.labels(reason=reason, result="fail").inc()
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "unready", "reason": reason}
+
+    READYZ_CHECKS.labels(reason="ok", result="success").inc()
+    return {"status": "ready"}

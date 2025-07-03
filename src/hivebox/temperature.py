@@ -1,5 +1,6 @@
 """Temperature data processing module."""
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -10,9 +11,12 @@ from .metrics import (
     OPENSENSEMAP_CALLS,
     OPENSENSEMAP_LATENCY,
     OPENSENSEMAP_AGE,
+    UNREACHABLE_SENSORS,
     TEMPERATURE_SENSORS_USED,
 )
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class TemperatureServiceError(Exception):
@@ -57,63 +61,62 @@ class TemperatureService:
         return TemperatureResult(value=avg_temp, status=status, timestamp=computed_at)
 
     def _fetch_readings(self, mode: str) -> List[SensorReading]:
-        """Fetch current readings from all sensors that are less than 1 hour old."""
-        readings = []
+        """
+        Fetch current readings from all sensors that are less than 1 hour old.
+        This method is resilient and will continue even if some sensors fail.
+        """
+        readings: List[SensorReading] = []
+        unreachable_count = 0
         current_time = datetime.now(timezone.utc)
 
-        for box_id, sensor_id in self.sensor_data.items():
-            url = get_sensor_data(box_id, sensor_id)
-            start_time = time.time()
-            try:
-                resp = requests.get(url, timeout=30)
-                resp.raise_for_status()
-                data = resp.json()
-                reading_time = datetime.fromisoformat(
-                    data['lastMeasurement']['createdAt'].replace('Z', '+00:00'))
-                time_diff = current_time - reading_time
+        try:
+            for box_id, sensor_id in self.sensor_data.items():
+                url = get_sensor_data(box_id, sensor_id)
+                start_time = time.time()
+                try:
+                    resp = requests.get(url, timeout=30)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    reading_time = datetime.fromisoformat(
+                        data['lastMeasurement']['createdAt'].replace('Z', '+00:00'))
+                    time_diff = current_time - reading_time
 
-                OPENSENSEMAP_AGE.labels(
-                    sensebox_id=box_id).observe(
-                        time_diff.total_seconds()
-                )
+                    OPENSENSEMAP_AGE.labels(
+                        sensebox_id=box_id).observe(
+                            time_diff.total_seconds()
+                    )
 
-                if time_diff.total_seconds() > 3600:
+                    if time_diff.total_seconds() > 3600:
+                        OPENSENSEMAP_CALLS.labels(
+                            sensebox_id=box_id, result="stale", mode=mode).inc()
+                        unreachable_count += 1
+                        continue
+
                     OPENSENSEMAP_CALLS.labels(
-                        sensebox_id=box_id, result="stale", mode=mode).inc()
-                    continue
+                        sensebox_id=box_id, result="success", mode=mode).inc()
 
-                OPENSENSEMAP_CALLS.labels(
-                    sensebox_id=box_id, result="success", mode=mode).inc()
+                    reading = SensorReading(
+                        timestamp=reading_time,
+                        value=float(data['lastMeasurement']['value']),
+                        sensor_id=sensor_id)
+                    readings.append(reading)
 
-                reading = SensorReading(
-                    timestamp=reading_time,
-                    value=float(data['lastMeasurement']['value']),
-                    sensor_id=sensor_id)
-                readings.append(reading)
+                except (requests.RequestException, ValueError, KeyError) as e:
+                    logger.warning("Failed to get reading for sensor %s: %s", sensor_id, e)
+                    OPENSENSEMAP_CALLS.labels(
+                        sensebox_id=box_id, result="error", mode=mode).inc()
+                    unreachable_count += 1
 
-            except Exception as e:
-                OPENSENSEMAP_CALLS.labels(
-                    sensebox_id=box_id, result="error", mode=mode).inc()
-                if isinstance(e, requests.RequestException):
-                    raise TemperatureServiceError(
-                        f"Failed to fetch data for sensor {sensor_id}: {str(e)}"
-                    ) from e
-                elif isinstance(e, (ValueError, KeyError)):
-                    raise TemperatureServiceError(
-                        f"Invalid data received from sensor {sensor_id}: {str(e)}"
-                    ) from e
-                else:
-                    raise TemperatureServiceError(
-                        f"Unexpected error for sensor {sensor_id}: {str(e)}"
-                    ) from e
-            finally:
-                latency = time.time() - start_time
-                OPENSENSEMAP_LATENCY.labels(sensebox_id=box_id).observe(latency)
+                finally:
+                    latency = time.time() - start_time
+                    OPENSENSEMAP_LATENCY.labels(sensebox_id=box_id).observe(latency)
 
-        if not readings:
-            raise TemperatureServiceError("All available readings are over 1 hour old")
+            if not readings:
+                raise TemperatureServiceError("No valid sensor readings could be fetched")
 
-        return readings
+            return readings
+        finally:
+            UNREACHABLE_SENSORS.set(unreachable_count)
 
     def _determine_temperature_status(self, temperature: float) -> str:
         """Return temperature status based on provided value."""
