@@ -7,10 +7,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, FastAPI, Request, Response, HTTPException, Depends
-from hivebox.config import get_settings
+from hivebox.config import get_settings, Settings
 from hivebox.cache import CacheService, CacheServiceError
 from hivebox.store import StorageService, StorageServiceError
-from hivebox import __version__, SENSEBOX_TEMP_SENSORS as SB_SENS
+from hivebox import __version__
 from hivebox.temperature import (
     TemperatureService,
     TemperatureServiceError,
@@ -40,12 +40,16 @@ async def poll(job_id: str):
     mode = "auto"
     next_delay = 300
     result = "success"
+    tmp_sensors = get_settings().tmp_sensors
+    osm_base_url = get_settings().osm_base_url
+    s3_available = True
     
     try:
         last_temp, age = (None, None)
         try:
             last_temp, age = await app.state.store_svc.get_stored_temperature(mode)
         except StorageServiceError as e:
+            s3_available = False
             logger.info("S3 data not available, proceeding to poll for new data: %s", e)
 
         if last_temp and age < 300:
@@ -53,10 +57,18 @@ async def poll(job_id: str):
             logger.info("S3 data is fresh. Hydrating cache. Next poll in %s seconds.", next_delay)
             await safe_cache_update(app.state.cache_svc, last_temp, mode)
         else:
-            logger.info("Polling for new temperature data...")
-            temp_svc = TemperatureService(SB_SENS)
+            if last_temp:
+                logger.info("S3 data is stale. Polling for new temperature data...")
+            else:
+                logger.info("Polling for new temperature data...")
+            temp_svc = TemperatureService(osm_base_url, tmp_sensors)
             new_temp = temp_svc.get_average_temperature(mode)
-            await app.state.store_svc.store_temperature_result(new_temp, mode)
+            if s3_available:
+                await app.state.store_svc.store_temperature_result(new_temp, mode)
+            else:
+                logger.warning(
+                    "Skipping S3 store operation due to earlier connection failure."
+                )
             await safe_cache_update(app.state.cache_svc, new_temp, mode)
             logger.info("Polled and updated stores. Next poll in %s seconds.", next_delay)
     except (TemperatureServiceError, StorageServiceError) as e:
@@ -102,8 +114,8 @@ async def lifespan(app: FastAPI):
             await app.state.store_svc.connect()
         except Exception:
             raise
-    except Exception:
-        raise
+    except Exception as e:
+        print(e, flush=True)
     try:
         app.state.cache_svc = CacheService(redis_dsn, redis_config)
         try:
@@ -154,14 +166,19 @@ def get_store_svc(request: Request) -> StorageService:
     """Dependency to get the storage service."""
     return request.app.state.store_svc
 
+def get_settings_dependency() -> Settings:
+    """Dependency to get application settings."""
+    return get_settings()
+
 @app.get("/temperature", response_model=TemperatureResult)
 async def get_temperature(
     background_tasks: BackgroundTasks,
     cache_svc: CacheService = Depends(get_cache_svc),
     store_svc: StorageService = Depends(get_store_svc),
+    settings: Settings = Depends(get_settings_dependency),
 ):
     mode = "manual"
-    temp_svc = TemperatureService(SB_SENS)
+    temp_svc = TemperatureService(str(settings.osm_base_url), settings.tmp_sensors)
 
     try:
         cache = await cache_svc.fetch(mode)
@@ -175,12 +192,12 @@ async def get_temperature(
         logger.error("Failed to get average temperature: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Could not retrieve temperature data from sensors.") from e
 
+    background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
+
     try:
         await store_svc.store_temperature_result(result, mode)
     except StorageServiceError as e:
-        logger.warning("Failed to store temperature result on manual GET: %s", e, exc_info=True)
-
-    background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
+        logger.warning("Failed to store temperature result on manual GET: %s", e)
 
     return result
 
@@ -189,22 +206,23 @@ async def store_temperature(
     background_tasks: BackgroundTasks,
     cache_svc: CacheService = Depends(get_cache_svc),
     store_svc: StorageService = Depends(get_store_svc),
+    settings: Settings = Depends(get_settings_dependency),
 ):
     mode = "manual"
-    temp_svc = TemperatureService(SB_SENS)
+    temp_svc = TemperatureService(str(settings.osm_base_url), settings.tmp_sensors)
     try:
         result = temp_svc.get_average_temperature(mode)
     except TemperatureServiceError as e:
-        logger.error("Failed to get average temperature for storing: %s", e, exc_info=True)
+        logger.error("Failed to get average temperature for storing: %s", e)
         raise HTTPException(status_code=500, detail="Could not retrieve temperature data from sensors.") from e
-    
+
+    background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
+
     try:
         await store_svc.store_temperature_result(result, mode)
     except StorageServiceError as e:
-        logger.error("Failed to store temperature result: %s", e, exc_info=True)
+        logger.error("Failed to store temperature result: %s", e)
         raise HTTPException(status_code=500, detail="Failed to store temperature data.") from e
-
-    background_tasks.add_task(safe_cache_update, cache_svc, result, mode)
 
     return {"status": "OK"}
 

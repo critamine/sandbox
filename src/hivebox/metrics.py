@@ -1,7 +1,13 @@
 import time
 from fastapi import APIRouter, Response, status
-from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from . import SENSEBOX_TEMP_SENSORS
+from prometheus_client import (
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    CONTENT_TYPE_LATEST
+)
+from .config import get_settings
 
 REQUESTS = Counter(
     "hivebox_requests_total",
@@ -125,7 +131,7 @@ def readyz(response: Response):
     1. More than 50% of sensors are unreachable, AND
     2. The cache is older than 5 minutes.
     """
-    total_sensors = len(SENSEBOX_TEMP_SENSORS)
+    total_sensors = len(get_settings().tmp_sensors)
     failure_threshold = (total_sensors // 2) + 1
 
     unreachable_count = UNREACHABLE_SENSORS._value.get()

@@ -9,6 +9,7 @@ in pkgs.mkShell {
     pkgs.kubectl
     pkgs.kind
     pkgs.trivy
+    pkgs.kompose
   ];
   
  shellHook = ''

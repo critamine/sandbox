@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List, Dict
 import requests
-from . import get_sensor_data
 from .metrics import (
     OPENSENSEMAP_CALLS,
     OPENSENSEMAP_LATENCY,
@@ -37,21 +36,29 @@ class TemperatureResult(BaseModel):
     status: str
     timestamp: int
 
+def sensor_url(base_url: str, box_id: str, sensor_id: str) -> str:
+    """Build the full endpoint for a given senseBox sensor"""
+    return f"{base_url}boxes/{box_id}/sensors/{sensor_id}"
+
+
 # pylint: disable=too-few-public-methods
 class TemperatureService:
     """Service for processing temperature data from sensors."""
 
-    def __init__(self, sensor_data: Dict[str, str]):
+    def __init__(
+            self,
+            osm_base_url: str,
+            sensor_map: Dict[str, str]
+        ):
         """Initialize temperature service with sensor data mapping."""
-        if not sensor_data:
+        if not sensor_map:
             raise TemperatureServiceError("No sensor data provided")
-        self.sensor_data = sensor_data
+        self.osm_base_url = osm_base_url
+        self.sensor_map = sensor_map
 
     def get_average_temperature(self, mode: str) -> TemperatureResult:
         """Calculate and return average temperature from all sensor readings."""
-        readings = self._fetch_readings(mode=mode)
-        if not readings:
-            raise TemperatureServiceError("No readings available")
+        readings = self._fetch_readings(mode)
         TEMPERATURE_SENSORS_USED.set(len(readings))
                
         avg_temp = round(sum(r.value for r in readings) / len(readings), 1)
@@ -69,9 +76,9 @@ class TemperatureService:
         unreachable_count = 0
         current_time = datetime.now(timezone.utc)
 
-        try:
-            for box_id, sensor_id in self.sensor_data.items():
-                url = get_sensor_data(box_id, sensor_id)
+        try: # pylint: disable=too-many-nested-blocks
+            for box_id, sensor_id in self.sensor_map.items():
+                url = sensor_url(self.osm_base_url, box_id, sensor_id)
                 start_time = time.time()
                 try:
                     resp = requests.get(url, timeout=30)

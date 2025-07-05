@@ -35,6 +35,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+    tmp_sensors: dict[str, str] = Field(
+        ...,
+        validation_alias=AliasChoices("SENSEBOX_TEMP_SENSORS")
+    )
+    osm_base_url: HttpUrl = Field(
+        ...,
+        validation_alias=AliasChoices("OSM_BASE_URL")
+    )
     redis_url: RedisDsn = Field(
         "redis://localhost:6379/0",
         validation_alias=AliasChoices("REDIS_URL"),

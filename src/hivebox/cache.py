@@ -5,7 +5,11 @@ import asyncio
 from pydantic import ValidationError
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
-from hivebox.metrics import REDIS_CALLS, REDIS_LATENCY
+from hivebox.metrics import (
+    REDIS_CALLS,
+    REDIS_LATENCY,
+    DEPENDENCY_RECONNECT_THROTTLED
+)
 from hivebox.temperature import TemperatureResult
 
 class CacheMessages:
@@ -47,8 +51,8 @@ class CacheService:
                     redis_result = "success"
                     return response
                 except (ConnectionError, RedisError, asyncio.CancelledError) as e:
-                    if attempt == 1:
-                        await self.connect()  # one reconnect try
+                    if attempt == 1 and mode != "connect":
+                        await self.connect()
                         continue
                     raise CacheServiceError(CacheMessages.REDIS_CONN_FAIL) from e
         finally:
@@ -60,6 +64,7 @@ class CacheService:
         """(Re)initialise the Redis client, counted as a 'connect' operation."""
         now = int(time.time())
         if self.last_retry and (now - self.last_retry) < 300:
+            DEPENDENCY_RECONNECT_THROTTLED.labels(dependency="redis").inc()
             raise CacheServiceError(CacheMessages.RETRY_TOO_SOON)
         self.last_retry = now
 
